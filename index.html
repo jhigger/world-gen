@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Terrain Generation Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div class="app-container loading">
+    <!-- Sidebar Control Panel -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="icon">🏔️</span>
+        <h1>TerrainForge 3D</h1>
+        <p class="subtitle">Algorithm Analysis & Comparison</p>
+      </div>
+
+      <div class="control-section">
+        <h2>View & Layout</h2>
+        <div class="button-group has-tooltip">
+          <button id="btn-grid-view" class="active" title="Hotkey: 0 or `">Compare (Grid)</button>
+          <select id="select-single-algo" title="Hotkey: 1 to 5">
+            <option value="0">Value Noise (c. 1980)</option>
+            <option value="1">Perlin Noise (1983)</option>
+            <option value="2">Simplex Noise (2001)</option>
+            <option value="3">Worley (Cellular) (1996)</option>
+            <option value="4">Fractional Brownian Motion (1968)</option>
+          </select>
+          <div class="tooltip-box">
+            <h5>View Mode</h5>
+            <p class="tooltip-desc">Switches the layout between a 5-way comparative grid and a single focused algorithm.</p>
+            <p><strong>Grid View:</strong> View all algorithms side-by-side.</p>
+            <p><strong>Focused View:</strong> Isolates one algorithm in full detail.</p>
+          </div>
+        </div>
+        <div class="control-group has-tooltip">
+          <label for="param-rotate-speed">Auto-Rotate Speed: <input type="number" id="val-rotate-speed" class="val-input" min="0" max="3" step="0.1" value="1.0"></label>
+          <input type="range" id="param-rotate-speed" min="0" max="3" step="0.1" value="1.0">
+          <div class="tooltip-box">
+            <h5>Auto-Rotate Speed</h5>
+            <p class="tooltip-desc">The speed at which the camera automatically orbits around the center of the terrain.</p>
+            <p><strong>Controls:</strong> Orbit rotation velocity in degrees per frame.</p>
+            <p><strong>Effect:</strong> Higher values rotate faster; 0 pauses rotation.</p>
+          </div>
+        </div>
+        <div class="control-group has-tooltip">
+          <label for="param-noise-speed">Noise Speed: <input type="number" id="val-noise-speed" class="val-input" min="0" max="10" step="0.1" value="0.0"></label>
+          <input type="range" id="param-noise-speed" min="0" max="10" step="0.1" value="0.0">
+          <div class="tooltip-box">
+            <h5>Noise Speed</h5>
+            <p class="tooltip-desc">Controls how fast the terrain noise pattern scrolls across the surface.</p>
+            <p><strong>Controls:</strong> Noise offset velocity multiplier.</p>
+            <p><strong>Effect:</strong> Higher values make the terrain flow faster; 0 freezes the terrain in place.</p>
+          </div>
+        </div>
+        <div class="control-group has-tooltip">
+          <label for="param-ui-scale">UI Scale (%) <input type="number" id="val-ui-scale" class="val-input" min="80" max="150" step="5" value="100"></label>
+          <input type="range" id="param-ui-scale" min="80" max="150" step="5" value="100">
+          <div class="tooltip-box">
+            <h5>UI Scale</h5>
+            <p class="tooltip-desc">Resizes the text, inputs, and layout dimensions of the control panel and overlays.</p>
+            <p><strong>Scale Range:</strong> 80% (compact) to 150% (enlarged).</p>
+            <p><strong>Significance:</strong> Crucial for high-resolution displays and general visual accessibility.</p>
+          </div>
+        </div>
+
+        <div class="toggle-group has-tooltip">
+          <label class="switch">
+            <input type="checkbox" id="toggle-wireframe">
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-label">Show Wireframe</span>
+          <div class="tooltip-box">
+            <h5>Wireframe Overlay</h5>
+            <p class="tooltip-desc">Overlays the wireframe structure of the terrain grid.</p>
+            <p><strong>Significance:</strong> Displays the underlying triangulated geometry of the mesh, useful for visual analysis of terrain density and slope complexity.</p>
+          </div>
+        </div>
+      </div>
+      <div class="control-section">
+        <h2>Terrain Configuration</h2>
+        
+        <div class="control-group has-tooltip">
+          <label for="param-seed">Terrain Seed</label>
+          <input type="number" id="param-seed" min="1" max="999999" value="67">
+          <div class="tooltip-box">
+            <h5>Terrain Seed</h5>
+            <p class="tooltip-desc">The starting seed value for the pseudo-random number generator (PRNG).</p>
+            <p><strong>Significance:</strong> Using the same seed guarantees identical terrain generation. Changing it generates new landforms.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-resolution">Tessellation: <input type="number" id="val-resolution" class="val-input" min="20" max="320" step="10" value="120"></label>
+          <input type="range" id="param-resolution" min="20" max="320" step="10" value="120">
+          <div class="tooltip-box">
+            <h5>Tessellation</h5>
+            <p class="tooltip-desc">The vertex density of the terrain mesh, representing the number of subdivisions in the 3D plane.</p>
+            <p><strong>Calculated:</strong> N x N divisions (e.g., 40x40 to 320x320 grid segments).</p>
+            <p><strong>Significance:</strong> Higher values create more detailed and visually complex terrain but increase rendering computations.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-zoom">Camera Zoom: <input type="number" id="val-zoom" class="val-input" min="50" max="800" step="10" value="180"></label>
+          <input type="range" id="param-zoom" min="50" max="800" step="10" value="180">
+          <div class="tooltip-box">
+            <h5>Camera Zoom</h5>
+            <p class="tooltip-desc">The distance of the camera from the center of the 3D grid.</p>
+            <p><strong>Significance:</strong> Lower values zoom in close for structural details; higher values zoom out for a bird's-eye view.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-pitch">Camera Pitch: <input type="number" id="val-pitch" class="val-input" min="0.1" max="3.0" step="0.05" value="0.8"></label>
+          <input type="range" id="param-pitch" min="0.1" max="3.0" step="0.05" value="0.8">
+          <div class="tooltip-box">
+            <h5>Camera Pitch</h5>
+            <p class="tooltip-desc">The vertical polar angle of the camera relative to the terrain plane.</p>
+            <p><strong>Significance:</strong> Adjusts viewpoint from side-on profile (low pitch) to top-down orthographic (high pitch).</p>
+          </div>
+        </div>
+
+
+        <div class="control-group has-tooltip">
+          <label for="param-target-x">Target Offset X: <input type="number" id="val-target-x" class="val-input" min="-5.0" max="5.0" step="0.1" value="0.0"></label>
+          <input type="range" id="param-target-x" min="-5.0" max="5.0" step="0.1" value="0.0">
+          <div class="tooltip-box">
+            <h5>Target Offset X</h5>
+            <p class="tooltip-desc">The horizontal X translation of the camera focus target.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-target-y">Target Offset Y: <input type="number" id="val-target-y" class="val-input" min="-5.0" max="5.0" step="0.1" value="0.5"></label>
+          <input type="range" id="param-target-y" min="-5.0" max="5.0" step="0.1" value="0.5">
+          <div class="tooltip-box">
+            <h5>Target Offset Y</h5>
+            <p class="tooltip-desc">The vertical Y translation of the camera focus target.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-target-z">Target Offset Z: <input type="number" id="val-target-z" class="val-input" min="-5.0" max="5.0" step="0.1" value="0.0"></label>
+          <input type="range" id="param-target-z" min="-5.0" max="5.0" step="0.1" value="0.0">
+          <div class="tooltip-box">
+            <h5>Target Offset Z</h5>
+            <p class="tooltip-desc">The horizontal Z translation of the camera focus target.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-height">Height Scale: <input type="number" id="val-height" class="val-input" min="0.2" max="4.0" step="0.1" value="0.8"></label>
+          <input type="range" id="param-height" min="0.2" max="4.0" step="0.1" value="0.8">
+          <div class="tooltip-box">
+            <h5>Height Scale</h5>
+            <p class="tooltip-desc">The maximum vertical displacement (amplitude) of the terrain vertices.</p>
+            <p><strong>Significance:</strong> Stretching this value increases steepness, making mountain peaks taller and valleys deeper.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-width">Width Scale: <input type="number" id="val-width" class="val-input" min="0.2" max="4.0" step="0.1" value="2.0"></label>
+          <input type="range" id="param-width" min="0.2" max="4.0" step="0.1" value="2.0">
+          <div class="tooltip-box">
+            <h5>Width Scale</h5>
+            <p class="tooltip-desc">The horizontal stretch (X and Z boundaries) of the terrain mesh.</p>
+            <p><strong>Significance:</strong> Stretching this value expands the horizontal dimensions of the landform, making features wider.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-scale">Noise Scale: <input type="number" id="val-scale" class="val-input" min="5" max="100" step="5" value="50"></label>
+          <input type="range" id="param-scale" min="5" max="100" step="5" value="50">
+          <div class="tooltip-box">
+            <h5>Noise Scale</h5>
+            <p class="tooltip-desc">The horizontal scale or zoom level of the generator's noise patterns.</p>
+            <p><strong>Significance:</strong> Lower scale values pack features tightly for chaotic details; higher values create broad, smooth plains.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-octaves">Octaves: <input type="number" id="val-octaves" class="val-input" min="1" max="6" step="1" value="3"></label>
+          <input type="range" id="param-octaves" min="1" max="6" step="1" value="3">
+          <div class="tooltip-box">
+            <h5>Noise Octaves</h5>
+            <p class="tooltip-desc">The number of detail layers layered together to construct the fractal noise terrain.</p>
+            <p><strong>Significance:</strong> Each additional octave adds finer micro-features. More octaves create much more organic landforms.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-persistence">Persistence: <input type="number" id="val-persistence" class="val-input" min="0.1" max="1.0" step="0.05" value="0.5"></label>
+          <input type="range" id="param-persistence" min="0.1" max="1.0" step="0.05" value="0.5">
+          <div class="tooltip-box">
+            <h5>Persistence</h5>
+            <p class="tooltip-desc">Controls the amplitude decay (visual strength) of each successive noise octave.</p>
+            <p><strong>Significance:</strong> High persistence gives fine details more power, resulting in a rougher, more jagged terrain.</p>
+          </div>
+        </div>
+
+        <div class="control-group has-tooltip">
+          <label for="param-color">Color Palette</label>
+          <select id="param-color">
+            <option value="topo">Topographical (Natural)</option>
+            <option value="water">Deep Water (Oceanic)</option>
+            <option value="magma">Magma (Thermal)</option>
+            <option value="monochrome">Monochrome Metallic</option>
+          </select>
+          <div class="tooltip-box">
+            <h5>Color Palette</h5>
+            <p class="tooltip-desc">The color scheme applied to vertex elevations.</p>
+            <p><strong>Natural:</strong> Water, sand, grass, rock, and snow transitions.</p>
+            <p><strong>Thermal/Oceanic/Metallic:</strong> Styling overrides for analytical views.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h2>Physical Simulation (Erosion)</h2>
+        <div class="control-group has-tooltip">
+          <button id="toggle-erosion" class="btn-primary" style="margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg id="icon-erosion-play" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <svg id="icon-erosion-pause" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+            <span id="lbl-erosion">Play Erosion</span>
+          </button>
+          <div class="tooltip-box">
+            <h5>Hydraulic Erosion</h5>
+            <p class="tooltip-desc">Simulates physical rainfall weathering the terrain over time.</p>
+            <p><strong>Controls:</strong> Click to play/resume or pause the simulation. Pausing keeps the current eroded state visible.</p>
+            <p><strong>Significance:</strong> Rain droplets flow downhill, eroding high peaks and depositing soil sediment in low valleys.</p>
+          </div>
+        </div>
+        <button id="btn-reset-erosion" class="btn-secondary has-tooltip">
+          Reset Terrain
+          <div class="tooltip-box">
+            <h5>Reset Terrain</h5>
+            <p class="tooltip-desc">Wipes the current erosion height adjustments, restoring the original noise landforms.</p>
+          </div>
+        </button>
+      </div>
+
+      <div class="control-section">
+        <h2>Performance & Limits</h2>
+        <div class="control-group has-tooltip">
+          <label for="param-fps-limit">FPS Cap: <span id="val-fps-limit">Uncapped</span></label>
+          <select id="param-fps-limit">
+            <option value="uncapped">Uncapped</option>
+            <option value="30">30 FPS</option>
+            <option value="60">60 FPS</option>
+            <option value="90">90 FPS</option>
+            <option value="120">120 FPS</option>
+            <option value="144">144 FPS</option>
+            <option value="180">180 FPS</option>
+            <option value="custom">Custom Target</option>
+          </select>
+          <div class="tooltip-box">
+            <h5>Frame Rate Cap</h5>
+            <p class="tooltip-desc">Limits the refresh rate of the animation loop to save system resources.</p>
+            <p><strong>Significance:</strong> Capping frame rates helps reduce CPU/GPU temperatures and power draw, especially on laptops.</p>
+          </div>
+        </div>
+        <div class="control-group hidden has-tooltip" id="custom-fps-container">
+          <label for="param-custom-fps">Custom FPS Cap: <input type="number" id="val-custom-fps" class="val-input" min="15" max="240" step="5" value="60"></label>
+          <input type="range" id="param-custom-fps" min="15" max="240" step="5" value="60">
+          <div class="tooltip-box">
+            <h5>Custom FPS Cap</h5>
+            <p class="tooltip-desc">Enter a custom numerical refresh rate limit between 15 and 240 FPS.</p>
+          </div>
+        </div>
+        <button id="btn-benchmark" class="btn-primary has-tooltip">
+          Start Auto-Benchmark
+          <div class="tooltip-box">
+            <h5>Auto-Benchmark</h5>
+            <p class="tooltip-desc">Triggers an automated camera flight track around the terrain center to record rendering performance.</p>
+          </div>
+        </button>
+        <div id="benchmark-status" class="benchmark-status-panel hidden">
+          <p>State: <span id="bench-state">Inactive</span></p>
+          <p>Average FPS: <span id="bench-fps">-</span></p>
+          <p>Avg Frame Time: <span id="bench-frametime">-</span></p>
+          <p>Avg Render Time: <span id="bench-time">-</span></p>
+        </div>
+        <button id="btn-reset-defaults" class="btn-secondary has-tooltip">
+          Reset to Default
+          <div class="tooltip-box">
+            <h5>Reset to Default</h5>
+            <p class="tooltip-desc">Restores all settings to their factory defaults, including terrain parameters, camera, and display options.</p>
+          </div>
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="metrics-legend">
+          <h3>Metrics Legend</h3>
+          <ul class="legend-list">
+            <li>
+              <span class="legend-label">Format:</span>
+              <span class="legend-value"><code>Current / Average</code></span>
+            </li>
+            <li class="legend-explain">
+              Viewport metrics display the real-time value on the left, and the rolling average on the right.
+            </li>
+          </ul>
+        </div>
+
+        <h3>Keyboard Shortcuts</h3>
+        <ul class="hotkeys-list">
+          <li><kbd>1</kbd> - <kbd>5</kbd> : Focus Algorithm</li>
+          <li><kbd>0</kbd> or <kbd>`</kbd> : Comparative View</li>
+          <li><kbd>B</kbd> : Toggle Benchmark</li>
+          <li><kbd>E</kbd> : Toggle Erosion</li>
+          <li><kbd>W</kbd> : Toggle Triangle Mesh</li>
+          <li><kbd>Arrow Keys</kbd> : Travel Camera</li>
+          <li><kbd>Space</kbd> / <kbd>Shift</kbd> : Move Camera Up / Down</li>
+          <li><kbd>R</kbd> : Toggle Auto-Rotation</li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content Viewports Grid -->
+    <main class="main-content">
+      <div id="terrain-grid" class="terrain-grid">
+        
+        <!-- Viewport 1: Value Noise -->
+        <div class="viewport-card" id="card-0" data-index="0">
+          <div class="viewport-header">
+            <h3>Value Noise (c. 1980)</h3>
+            <span class="badge">Lattice</span>
+          </div>
+          <div class="canvas-container">
+            <canvas id="canvas-0"></canvas>
+            <div class="viewport-overlay">
+              <div class="metrics">
+                <div class="metric-item">
+                  <span class="metric-label">FPS</span>
+                  <strong id="fps-0">--</strong>
+                  <span class="metric-avg">/<span id="fps-avg-0">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>FPS (Frames Per Second)</h5>
+                    <p class="tooltip-desc">The frequency at which the simulator renders consecutive images (frames) to the screen.</p>
+                    <p><strong>Calculated:</strong> 1000ms divided by the average frame time.</p>
+                    <p><strong>Represents:</strong> Overall visual fluidity and update frequency.</p>
+                    <p><strong>Significance:</strong> Crucial for measuring interface responsiveness and smooth animation.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Frame</span>
+                  <strong id="frametime-0">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="frametime-avg-0">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Frame Time</h5>
+                    <p class="tooltip-desc">The total time elapsed between two consecutive frame updates, representing the complete frame cycle.</p>
+                    <p><strong>Calculated:</strong> Time delta between successive frames using performance.now().</p>
+                    <p><strong>Represents:</strong> Total CPU/GPU time budget consumed per frame cycle.</p>
+                    <p><strong>Significance:</strong> Must stay below 16.7ms for 60 FPS, or 8.3ms for 120 FPS, to prevent stutter.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Render</span>
+                  <strong id="time-0">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="time-avg-0">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Render Time</h5>
+                    <p class="tooltip-desc">The time spent preparing and drawing the 3D scene using WebGL/Three.js.</p>
+                    <p><strong>Calculated:</strong> Elapsed time of the scene draw and GPU submission sequence.</p>
+                    <p><strong>Represents:</strong> Graphics pipeline workload and CPU-to-GPU command overhead.</p>
+                    <p><strong>Significance:</strong> Identifies draw call bottlenecks, mesh complexity limits, or shader performance issues.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Math</span>
+                  <strong id="math-0">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="math-avg-0">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Math Time</h5>
+                    <p class="tooltip-desc">The time taken by the noise generator or subdivision algorithm to calculate height values.</p>
+                    <p><strong>Calculated:</strong> Execution timing of the height grid calculation block (including erosion steps).</p>
+                    <p><strong>Represents:</strong> Core algorithmic complexity and CPU computation cost.</p>
+                    <p><strong>Significance:</strong> Direct indicator of algorithm efficiency. Lower math times allow higher grid resolutions without freezing.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Rugged</span>
+                  <strong id="ruggedness-0">--</strong>
+                  <span class="metric-avg">/<span id="ruggedness-avg-0">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>Ruggedness</h5>
+                    <p class="tooltip-desc">The relative physical roughness, slope steepness, or complexity of the terrain surface.</p>
+                    <p><strong>Calculated:</strong> Root-mean-square (RMS) of elevation changes between adjacent grid vertices.</p>
+                    <p><strong>Represents:</strong> Geometric noise intensity and fractal dispersion features.</p>
+                    <p><strong>Significance:</strong> Quantifies the aesthetic variation and geologic realism generated by each algorithm.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="math-analysis">
+                <h4>Mathematical Analysis</h4>
+                <p>Assigns random values to grid intersections and interpolates between them. Produces blockier, more angular grid-aligned shapes.</p>
+                <div class="complexity-grid">
+                  <div class="complexity-item"><strong>Time (Vertex):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Time (Grid):</strong> &Theta;(N&sup2;)</div>
+                  <div class="complexity-item"><strong>Space (Aux):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Space (Grid):</strong> &Theta;(N&sup2;)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Viewport 2: Perlin Noise -->
+        <div class="viewport-card" id="card-1" data-index="1">
+          <div class="viewport-header">
+            <h3>Perlin Noise (1983)</h3>
+            <span class="badge">Standard</span>
+          </div>
+          <div class="canvas-container">
+            <canvas id="canvas-1"></canvas>
+            <div class="viewport-overlay">
+              <div class="metrics">
+                <div class="metric-item">
+                  <span class="metric-label">FPS</span>
+                  <strong id="fps-1">--</strong>
+                  <span class="metric-avg">/<span id="fps-avg-1">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>FPS (Frames Per Second)</h5>
+                    <p class="tooltip-desc">The frequency at which the simulator renders consecutive images (frames) to the screen.</p>
+                    <p><strong>Calculated:</strong> 1000ms divided by the average frame time.</p>
+                    <p><strong>Represents:</strong> Overall visual fluidity and update frequency.</p>
+                    <p><strong>Significance:</strong> Crucial for measuring interface responsiveness and smooth animation.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Frame</span>
+                  <strong id="frametime-1">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="frametime-avg-1">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Frame Time</h5>
+                    <p class="tooltip-desc">The total time elapsed between two consecutive frame updates, representing the complete frame cycle.</p>
+                    <p><strong>Calculated:</strong> Time delta between successive frames using performance.now().</p>
+                    <p><strong>Represents:</strong> Total CPU/GPU time budget consumed per frame cycle.</p>
+                    <p><strong>Significance:</strong> Must stay below 16.7ms for 60 FPS, or 8.3ms for 120 FPS, to prevent stutter.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Render</span>
+                  <strong id="time-1">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="time-avg-1">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Render Time</h5>
+                    <p class="tooltip-desc">The time spent preparing and drawing the 3D scene using WebGL/Three.js.</p>
+                    <p><strong>Calculated:</strong> Elapsed time of the scene draw and GPU submission sequence.</p>
+                    <p><strong>Represents:</strong> Graphics pipeline workload and CPU-to-GPU command overhead.</p>
+                    <p><strong>Significance:</strong> Identifies draw call bottlenecks, mesh complexity limits, or shader performance issues.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Math</span>
+                  <strong id="math-1">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="math-avg-1">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Math Time</h5>
+                    <p class="tooltip-desc">The time taken by the noise generator or subdivision algorithm to calculate height values.</p>
+                    <p><strong>Calculated:</strong> Execution timing of the height grid calculation block (including erosion steps).</p>
+                    <p><strong>Represents:</strong> Core algorithmic complexity and CPU computation cost.</p>
+                    <p><strong>Significance:</strong> Direct indicator of algorithm efficiency. Lower math times allow higher grid resolutions without freezing.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Rugged</span>
+                  <strong id="ruggedness-1">--</strong>
+                  <span class="metric-avg">/<span id="ruggedness-avg-1">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>Ruggedness</h5>
+                    <p class="tooltip-desc">The relative physical roughness, slope steepness, or complexity of the terrain surface.</p>
+                    <p><strong>Calculated:</strong> Root-mean-square (RMS) of elevation changes between adjacent grid vertices.</p>
+                    <p><strong>Represents:</strong> Geometric noise intensity and fractal dispersion features.</p>
+                    <p><strong>Significance:</strong> Quantifies the aesthetic variation and geologic realism generated by each algorithm.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="math-analysis">
+                <h4>Mathematical Analysis</h4>
+                <p>Generates hermitically interpolated pseudo-random gradients. Offers smooth continuous transitions with first-order spatial coherence.</p>
+                <div class="complexity-grid">
+                  <div class="complexity-item"><strong>Time (Vertex):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Time (Grid):</strong> &Theta;(N&sup2;)</div>
+                  <div class="complexity-item"><strong>Space (Aux):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Space (Grid):</strong> &Theta;(N&sup2;)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Viewport 3: Simplex Noise -->
+        <div class="viewport-card" id="card-2" data-index="2">
+          <div class="viewport-header">
+            <h3>Simplex Noise (2001)</h3>
+            <span class="badge">Optimal</span>
+          </div>
+          <div class="canvas-container">
+            <canvas id="canvas-2"></canvas>
+            <div class="viewport-overlay">
+              <div class="metrics">
+                <div class="metric-item">
+                  <span class="metric-label">FPS</span>
+                  <strong id="fps-2">--</strong>
+                  <span class="metric-avg">/<span id="fps-avg-2">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>FPS (Frames Per Second)</h5>
+                    <p class="tooltip-desc">The frequency at which the simulator renders consecutive images (frames) to the screen.</p>
+                    <p><strong>Calculated:</strong> 1000ms divided by the average frame time.</p>
+                    <p><strong>Represents:</strong> Overall visual fluidity and update frequency.</p>
+                    <p><strong>Significance:</strong> Crucial for measuring interface responsiveness and smooth animation.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Frame</span>
+                  <strong id="frametime-2">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="frametime-avg-2">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Frame Time</h5>
+                    <p class="tooltip-desc">The total time elapsed between two consecutive frame updates, representing the complete frame cycle.</p>
+                    <p><strong>Calculated:</strong> Time delta between successive frames using performance.now().</p>
+                    <p><strong>Represents:</strong> Total CPU/GPU time budget consumed per frame cycle.</p>
+                    <p><strong>Significance:</strong> Must stay below 16.7ms for 60 FPS, or 8.3ms for 120 FPS, to prevent stutter.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Render</span>
+                  <strong id="time-2">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="time-avg-2">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Render Time</h5>
+                    <p class="tooltip-desc">The time spent preparing and drawing the 3D scene using WebGL/Three.js.</p>
+                    <p><strong>Calculated:</strong> Elapsed time of the scene draw and GPU submission sequence.</p>
+                    <p><strong>Represents:</strong> Graphics pipeline workload and CPU-to-GPU command overhead.</p>
+                    <p><strong>Significance:</strong> Identifies draw call bottlenecks, mesh complexity limits, or shader performance issues.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Math</span>
+                  <strong id="math-2">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="math-avg-2">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Math Time</h5>
+                    <p class="tooltip-desc">The time taken by the noise generator or subdivision algorithm to calculate height values.</p>
+                    <p><strong>Calculated:</strong> Execution timing of the height grid calculation block (including erosion steps).</p>
+                    <p><strong>Represents:</strong> Core algorithmic complexity and CPU computation cost.</p>
+                    <p><strong>Significance:</strong> Direct indicator of algorithm efficiency. Lower math times allow higher grid resolutions without freezing.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Rugged</span>
+                  <strong id="ruggedness-2">--</strong>
+                  <span class="metric-avg">/<span id="ruggedness-avg-2">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>Ruggedness</h5>
+                    <p class="tooltip-desc">The relative physical roughness, slope steepness, or complexity of the terrain surface.</p>
+                    <p><strong>Calculated:</strong> Root-mean-square (RMS) of elevation changes between adjacent grid vertices.</p>
+                    <p><strong>Represents:</strong> Geometric noise intensity and fractal dispersion features.</p>
+                    <p><strong>Significance:</strong> Quantifies the aesthetic variation and geologic realism generated by each algorithm.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="math-analysis">
+                <h4>Mathematical Analysis</h4>
+                <p>Divides space into a simplex grid (triangles in 2D), reducing directional artifacts and lowering coordinate computation scaling cost to O(N²).</p>
+                <div class="complexity-grid">
+                  <div class="complexity-item"><strong>Time (Vertex):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Time (Grid):</strong> &Theta;(N&sup2;)</div>
+                  <div class="complexity-item"><strong>Space (Aux):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Space (Grid):</strong> &Theta;(N&sup2;)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Viewport 4: Worley / Cellular Noise -->
+        <div class="viewport-card" id="card-3" data-index="3">
+          <div class="viewport-header">
+            <h3>Worley Noise (Cellular) (1996)</h3>
+            <span class="badge">Voronoi</span>
+          </div>
+          <div class="canvas-container">
+            <canvas id="canvas-3"></canvas>
+            <div class="viewport-overlay">
+              <div class="metrics">
+                <div class="metric-item">
+                  <span class="metric-label">FPS</span>
+                  <strong id="fps-3">--</strong>
+                  <span class="metric-avg">/<span id="fps-avg-3">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>FPS (Frames Per Second)</h5>
+                    <p class="tooltip-desc">The frequency at which the simulator renders consecutive images (frames) to the screen.</p>
+                    <p><strong>Calculated:</strong> 1000ms divided by the average frame time.</p>
+                    <p><strong>Represents:</strong> Overall visual fluidity and update frequency.</p>
+                    <p><strong>Significance:</strong> Crucial for measuring interface responsiveness and smooth animation.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Frame</span>
+                  <strong id="frametime-3">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="frametime-avg-3">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Frame Time</h5>
+                    <p class="tooltip-desc">The total time elapsed between two consecutive frame updates, representing the complete frame cycle.</p>
+                    <p><strong>Calculated:</strong> Time delta between successive frames using performance.now().</p>
+                    <p><strong>Represents:</strong> Total CPU/GPU time budget consumed per frame cycle.</p>
+                    <p><strong>Significance:</strong> Must stay below 16.7ms for 60 FPS, or 8.3ms for 120 FPS, to prevent stutter.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Render</span>
+                  <strong id="time-3">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="time-avg-3">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Render Time</h5>
+                    <p class="tooltip-desc">The time spent preparing and drawing the 3D scene using WebGL/Three.js.</p>
+                    <p><strong>Calculated:</strong> Elapsed time of the scene draw and GPU submission sequence.</p>
+                    <p><strong>Represents:</strong> Graphics pipeline workload and CPU-to-GPU command overhead.</p>
+                    <p><strong>Significance:</strong> Identifies draw call bottlenecks, mesh complexity limits, or shader performance issues.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Math</span>
+                  <strong id="math-3">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="math-avg-3">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Math Time</h5>
+                    <p class="tooltip-desc">The time taken by the noise generator or subdivision algorithm to calculate height values.</p>
+                    <p><strong>Calculated:</strong> Execution timing of the height grid calculation block (including erosion steps).</p>
+                    <p><strong>Represents:</strong> Core algorithmic complexity and CPU computation cost.</p>
+                    <p><strong>Significance:</strong> Direct indicator of algorithm efficiency. Lower math times allow higher grid resolutions without freezing.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Rugged</span>
+                  <strong id="ruggedness-3">--</strong>
+                  <span class="metric-avg">/<span id="ruggedness-avg-3">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>Ruggedness</h5>
+                    <p class="tooltip-desc">The relative physical roughness, slope steepness, or complexity of the terrain surface.</p>
+                    <p><strong>Calculated:</strong> Root-mean-square (RMS) of elevation changes between adjacent grid vertices.</p>
+                    <p><strong>Represents:</strong> Geometric noise intensity and fractal dispersion features.</p>
+                    <p><strong>Significance:</strong> Quantifies the aesthetic variation and geologic realism generated by each algorithm.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="math-analysis">
+                <h4>Mathematical Analysis</h4>
+                <p>Calculates distances to nearest seed points. Produces cellular geometric patterns suited for stone, scales, or dry valley structures.</p>
+                <div class="complexity-grid">
+                  <div class="complexity-item"><strong>Time (Vertex):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Time (Grid):</strong> &Theta;(N&sup2;)</div>
+                  <div class="complexity-item"><strong>Space (Aux):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Space (Grid):</strong> &Theta;(N&sup2;)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Viewport 5: Fractional Brownian Motion -->
+        <div class="viewport-card" id="card-4" data-index="4">
+          <div class="viewport-header">
+            <h3>Fractional Brownian Motion (1968)</h3>
+            <span class="badge">fBm</span>
+          </div>
+          <div class="canvas-container">
+            <canvas id="canvas-4"></canvas>
+            <div class="viewport-overlay">
+              <div class="metrics">
+                <div class="metric-item">
+                  <span class="metric-label">FPS</span>
+                  <strong id="fps-4">--</strong>
+                  <span class="metric-avg">/<span id="fps-avg-4">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>FPS (Frames Per Second)</h5>
+                    <p class="tooltip-desc">The frequency at which the simulator renders consecutive images (frames) to the screen.</p>
+                    <p><strong>Calculated:</strong> 1000ms divided by the average frame time.</p>
+                    <p><strong>Represents:</strong> Overall visual fluidity and update frequency.</p>
+                    <p><strong>Significance:</strong> Crucial for measuring interface responsiveness and smooth animation.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Frame</span>
+                  <strong id="frametime-4">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="frametime-avg-4">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Frame Time</h5>
+                    <p class="tooltip-desc">The total time elapsed between two consecutive frame updates, representing the complete frame cycle.</p>
+                    <p><strong>Calculated:</strong> Time delta between successive frames using performance.now().</p>
+                    <p><strong>Represents:</strong> Total CPU/GPU time budget consumed per frame cycle.</p>
+                    <p><strong>Significance:</strong> Must stay below 16.7ms for 60 FPS, or 8.3ms for 120 FPS, to prevent stutter.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Render</span>
+                  <strong id="time-4">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="time-avg-4">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Render Time</h5>
+                    <p class="tooltip-desc">The time spent preparing and drawing the 3D scene using WebGL/Three.js.</p>
+                    <p><strong>Calculated:</strong> Elapsed time of the scene draw and GPU submission sequence.</p>
+                    <p><strong>Represents:</strong> Graphics pipeline workload and CPU-to-GPU command overhead.</p>
+                    <p><strong>Significance:</strong> Identifies draw call bottlenecks, mesh complexity limits, or shader performance issues.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Math</span>
+                  <strong id="math-4">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="math-avg-4">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Math Time</h5>
+                    <p class="tooltip-desc">The time taken by the noise generator or subdivision algorithm to calculate height values.</p>
+                    <p><strong>Calculated:</strong> Execution timing of the height grid calculation block (including erosion steps).</p>
+                    <p><strong>Represents:</strong> Core algorithmic complexity and CPU computation cost.</p>
+                    <p><strong>Significance:</strong> Direct indicator of algorithm efficiency. Lower math times allow higher grid resolutions without freezing.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Rugged</span>
+                  <strong id="ruggedness-4">--</strong>
+                  <span class="metric-avg">/<span id="ruggedness-avg-4">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>Ruggedness</h5>
+                    <p class="tooltip-desc">The relative physical roughness, slope steepness, or complexity of the terrain surface.</p>
+                    <p><strong>Calculated:</strong> Root-mean-square (RMS) of elevation changes between adjacent grid vertices.</p>
+                    <p><strong>Represents:</strong> Geometric noise intensity and fractal dispersion features.</p>
+                    <p><strong>Significance:</strong> Quantifies the aesthetic variation and geologic realism generated by each algorithm.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="math-analysis">
+                <h4>Mathematical Analysis</h4>
+                <p>Layers octaves of gradient noise with domain warping to produce self-similar fractal terrain with organic, swirling continental features.</p>
+                <div class="complexity-grid">
+                  <div class="complexity-item"><strong>Time (Vertex):</strong> &Theta;(K)</div>
+                  <div class="complexity-item"><strong>Time (Grid):</strong> &Theta;(K &middot; N&sup2;)</div>
+                  <div class="complexity-item"><strong>Space (Aux):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Space (Grid):</strong> &Theta;(N&sup2;)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
+

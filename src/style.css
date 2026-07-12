@@ -1,0 +1,875 @@
+/* 
+ * MAIN STYLESHEET FOR THE 3D TERRAIN SIMULATOR
+ * 
+ * Defines the global visual design system (colors, typography,
+ * glassmorphism effects, grid transitions, and custom ranges).
+ */
+
+:root {
+  /* Manual UI scaling factor (default: 1.0 = 100%) */
+  --ui-scale: 1.0;
+
+  /* Curated Color Palette */
+  --bg-primary: #0a0d14;
+  --bg-secondary: #121620;
+  --bg-glass: rgba(18, 22, 32, 0.7);
+  --border-glass: rgba(255, 255, 255, 0.06);
+  --border-focus: rgba(99, 102, 241, 0.4);
+  
+  --accent-primary: #6366f1; /* Indigo */
+  --accent-secondary: #06b6d4; /* Cyan */
+  --accent-gradient: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  --accent-glow: rgba(99, 102, 241, 0.35);
+
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-inverse: #0f172a;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  /* Typography & Spacings */
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  
+  --sidebar-width: 340px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  /* Combine fluid scaling with manual user scale multiplier. */
+  font-size: calc(clamp(14px, 0.85rem + 0.15vw, 18px) * var(--ui-scale, 1.0));
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* App Container Layout */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+  opacity: 1;
+  transition: opacity 0.25s ease-in-out;
+}
+
+/* Hide container on startup to prevent default values from flashing */
+.app-container.loading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* SIDEBAR CONTROL PANEL */
+.sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--border-glass);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  overflow-y: auto;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+/* Hide scrollbar track but keep it functional */
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+}
+
+.sidebar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-header .icon {
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+}
+
+.sidebar-header h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sidebar-header .subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Control Sections */
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 24px;
+}
+
+.control-section:last-of-type {
+  border-bottom: none;
+}
+
+.control-section h2 {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Control Groups & Labels */
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group label {
+  font-size: 0.85rem;
+  font-weight: 400;
+  display: flex;
+  justify-content: space-between;
+}
+
+.control-group label span {
+  color: var(--accent-secondary);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+/* Buttons, Selects and Ranges */
+button, select, input[type="range"], input[type="number"] {
+  width: 100%;
+}
+
+select, input[type="number"] {
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  color: var(--text-main);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+select {
+  cursor: pointer;
+}
+
+select:focus, input[type="number"]:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+select option {
+  background-color: var(--bg-secondary);
+  color: var(--text-main);
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+button {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background: var(--accent-gradient);
+  color: var(--text-inverse);
+  box-shadow: 0 4px 15px var(--accent-glow);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-secondary {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  color: var(--text-main);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+#btn-grid-view {
+  background-color: rgba(99, 102, 241, 0.1);
+  border: 1px solid var(--accent-primary);
+  color: var(--text-main);
+}
+
+#btn-grid-view.active {
+  background: var(--accent-gradient);
+  color: var(--text-inverse);
+  border-color: transparent;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+/* Custom Range Sliders */
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  margin: 10px 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 0 8px var(--accent-secondary);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  background: var(--text-main);
+}
+
+/* Toggle Switch for Erosion */
+.toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: .3s;
+  border-radius: 24px;
+  border: 1px solid var(--border-glass);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--text-muted);
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: rgba(6, 182, 212, 0.2);
+  border-color: var(--accent-secondary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+  background-color: var(--accent-secondary);
+  box-shadow: 0 0 8px var(--accent-secondary);
+}
+
+.toggle-label {
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+
+/* Benchmark Stats Panel */
+.benchmark-status-panel {
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+}
+
+.benchmark-status-panel p span {
+  font-weight: 700;
+  color: var(--accent-secondary);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Keyboard Kbd Styling */
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-footer h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.hotkeys-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.hotkeys-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+kbd {
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-glass);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+/*
+ * Styling for the Metrics Legend component in the sidebar.
+ * Added to clarify the "Current / Average" metric display formatting used inside viewport cards.
+ */
+.metrics-legend {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metrics-legend h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.legend-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.legend-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.legend-list li.legend-explain {
+  display: block;
+  line-height: 1.4;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.legend-label {
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.legend-value code {
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-glass);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  color: var(--accent-secondary);
+}
+
+/* MAIN VIEWPORTS GRID */
+.main-content {
+  flex-grow: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.terrain-grid {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Focused Single View Mode */
+.terrain-grid.single-view {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.terrain-grid.single-view .viewport-card {
+  display: none;
+}
+
+.terrain-grid.single-view .viewport-card.focused {
+  display: flex;
+  grid-column: span 3;
+  grid-row: span 2;
+}
+
+/* Individual Viewport Card */
+.viewport-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.viewport-card:hover {
+  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.viewport-card.focused {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 25px rgba(99, 102, 241, 0.15);
+}
+
+.viewport-header {
+  padding: 12px 18px;
+  background-color: rgba(255, 255, 255, 0.01);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.viewport-header h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  background-color: rgba(6, 182, 212, 0.1);
+  color: var(--accent-secondary);
+  border-radius: 20px;
+  letter-spacing: 0.8px;
+  border: 1px solid rgba(6, 182, 212, 0.15);
+}
+
+.canvas-container {
+  flex-grow: 1;
+  position: relative;
+  background-color: #05070c;
+  overflow: hidden;
+}
+
+.canvas-container canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Viewport HUD Overlays (Stats & Math descriptions) */
+.viewport-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none; /* Let pointer events fall through to the canvas */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.metrics {
+  align-self: flex-end;
+  background-color: rgba(5, 7, 12, 0.8);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  pointer-events: auto; /* Enable hover triggers on overlay metrics */
+}
+
+.metrics strong {
+  color: var(--accent-secondary);
+  display: inline-block;
+  text-align: right;
+}
+
+/* 
+ * Apply fixed monospaced widths to metric values. 
+ * This prevents the entire overlay box from resizing and bouncing 
+ * when the number of digits or character widths change.
+ */
+.metrics strong[id^="fps-"] {
+  min-width: 3ch;
+}
+.metrics strong[id^="frametime-"] {
+  min-width: 6ch;
+}
+.metrics strong[id^="time-"] {
+  min-width: 6ch;
+}
+.metrics strong[id^="math-"] {
+  min-width: 6ch;
+}
+.metrics strong[id^="ruggedness-"] {
+  min-width: 5ch;
+}
+
+/* Fixed widths for averages to prevent resizing/bouncing */
+.metric-avg span[id^="fps-avg-"] {
+  min-width: 3ch;
+  display: inline-block;
+  text-align: right;
+}
+.metric-avg span[id^="frametime-avg-"] {
+  min-width: 6ch;
+  display: inline-block;
+  text-align: right;
+}
+.metric-avg span[id^="time-avg-"] {
+  min-width: 6ch;
+  display: inline-block;
+  text-align: right;
+}
+.metric-avg span[id^="math-avg-"] {
+  min-width: 6ch;
+  display: inline-block;
+  text-align: right;
+}
+.metric-avg span[id^="ruggedness-avg-"] {
+  min-width: 5ch;
+  display: inline-block;
+  text-align: right;
+}
+
+.metric-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: help;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s ease;
+  gap: 2px;
+}
+
+.metric-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.metric-label {
+  color: var(--text-muted);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
+  margin-right: 4px;
+}
+
+.metric-avg {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.unit {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+/* Tooltip styles */
+.tooltip-box {
+  display: none !important; /* Hide templates inside card to avoid layout shifts or clipping */
+}
+
+.global-tooltip-box {
+  position: fixed; /* Fixed viewport positioning */
+  width: 270px;
+  background-color: rgba(10, 13, 20, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999; /* Stay on top of everything, including WebGL canvas and sidebar */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(99, 102, 241, 0.2);
+  pointer-events: none;
+  font-family: var(--font-sans);
+  text-align: left;
+}
+
+.tooltip-box h5, .global-tooltip-box h5 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
+  margin: 0;
+}
+
+.tooltip-desc {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.tooltip-box p, .global-tooltip-box p {
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.tooltip-box p strong, .global-tooltip-box p strong {
+  color: var(--text-main);
+}
+
+
+.math-analysis {
+  background-color: rgba(5, 7, 12, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  max-width: 320px;
+  transform: translateY(15px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Hover reveal math description panel */
+.viewport-card:hover .math-analysis {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.math-analysis h4 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--accent-primary);
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.math-analysis p {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* Increased sizing for mathematical analysis panel when algorithm is focused */
+.viewport-card.focused .math-analysis {
+  max-width: 550px;
+  padding: 20px 24px;
+}
+
+.viewport-card.focused .math-analysis h4 {
+  font-size: 1.15rem;
+  margin-bottom: 8px;
+}
+
+.viewport-card.focused .math-analysis p {
+  font-size: 1.0rem;
+  line-height: 1.55;
+}
+
+.complexity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-glass);
+}
+.complexity-item {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.complexity-item strong {
+  color: var(--accent-primary);
+}
+.viewport-card.focused .complexity-item {
+  font-size: 0.85rem;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1024px) {
+  .app-container {
+    flex-direction: column;
+    overflow: auto;
+  }
+  .sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-glass);
+  }
+  .main-content {
+    height: calc(100vh - 350px);
+  }
+  .terrain-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+  }
+  .terrain-grid.single-view .viewport-card.focused {
+    grid-column: span 2;
+    grid-row: span 3;
+  }
+}
+
+@media (max-width: 640px) {
+  .terrain-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(5, 1fr);
+  }
+  .terrain-grid.single-view .viewport-card.focused {
+    grid-column: span 1;
+    grid-row: span 5;
+  }
+}
+
+/*
+ * Custom styling for numeric input fields aligned next to labels.
+ * A compact width is defined and the default browser spin controls are hidden
+ * to preserve the minimalist aesthetic and allow direct, precise editing of the parameters.
+ */
+.val-input {
+  width: 70px !important;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  color: var(--accent-secondary);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 2px 6px !important;
+  text-align: right;
+  transition: all 0.2s ease;
+  outline: none;
+  margin-left: 8px;
+}
+
+.val-input:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 6px var(--accent-glow) !important;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Hide default browser spinner arrows (spinners) in WebKit and Firefox browsers */
+.val-input::-webkit-outer-spin-button,
+.val-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.val-input[type=number] {
+  -moz-appearance: textfield;
+}

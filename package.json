@@ -1,0 +1,22 @@
+{
+  "name": "world-gen-3d-comparison",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@types/three": "^0.184.1",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11",
+    "vite-node": "^6.0.0",
+    "vitest": "^2.1.9"
+  },
+  "dependencies": {
+    "three": "^0.184.0"
+  }
+}
