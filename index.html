@@ -12,12 +12,17 @@
 <body>
   <div class="app-container loading">
     <!-- Sidebar Control Panel -->
-    <aside class="sidebar">
+    <aside class="sidebar collapsed" id="mobile-sidebar">
+      <div class="mobile-sheet-handle" id="mobile-sheet-handle">
+        <div class="drag-bar"></div>
+        <button class="sheet-toggle-btn" id="btn-toggle-sheet" aria-label="Toggle Controls Panel">▲ Open Controls</button>
+      </div>
       <div class="sidebar-header">
         <span class="icon">🏔️</span>
         <h1>TerrainForge 3D</h1>
         <p class="subtitle">Algorithm Analysis & Comparison</p>
       </div>
+
 
       <div class="control-section">
         <h2>View & Layout</h2>
@@ -80,7 +85,22 @@
             <p><strong>Significance:</strong> Displays the underlying triangulated geometry of the mesh, useful for visual analysis of terrain density and slope complexity.</p>
           </div>
         </div>
+
+        <div class="toggle-group has-tooltip">
+          <label class="switch">
+            <input type="checkbox" id="toggle-metrics" checked>
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-label">Show Metrics Overlay</span>
+          <div class="tooltip-box">
+            <h5>Metrics Overlay</h5>
+            <p class="tooltip-desc">Toggles the FPS, Frame time, Render performance, and Mathematical analysis overlays over the 3D canvas.</p>
+            <p><strong>Significance:</strong> Hiding metrics provides an unobstructed 100% full-screen view of the 3D terrain canvas.</p>
+            <p><strong>Hotkey:</strong> Press <kbd>M</kbd> to toggle.</p>
+          </div>
+        </div>
       </div>
+
       <div class="control-section">
         <h2>Terrain Configuration</h2>
         
@@ -324,7 +344,19 @@
 
     <!-- Main Content Viewports Grid -->
     <main class="main-content">
+      <!-- Mobile Quick Viewport Switcher Tabs -->
+      <div class="mobile-algo-tabs" id="mobile-algo-tabs">
+        <button class="mobile-tab-btn active" data-index="0">Value</button>
+        <button class="mobile-tab-btn" data-index="1">Perlin</button>
+        <button class="mobile-tab-btn" data-index="2">Simplex</button>
+        <button class="mobile-tab-btn" data-index="3">Worley</button>
+        <button class="mobile-tab-btn" data-index="4">FBM</button>
+        <button class="mobile-tab-btn mobile-toggle-metrics-btn" id="mobile-toggle-metrics" title="Toggle Stats Overlay (M)">📊 Stats</button>
+      </div>
+
+
       <div id="terrain-grid" class="terrain-grid">
+
         
         <!-- Viewport 1: Value Noise -->
         <div class="viewport-card" id="card-0" data-index="0">
@@ -754,7 +786,21 @@
       </div>
     </main>
   </div>
+
+  <!-- Mobile Parameter Info Modal -->
+  <div id="mobile-info-modal" class="mobile-info-modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title">Parameter Information</h3>
+        <button class="modal-close-btn" id="modal-close-btn" aria-label="Close modal">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
+
 </html>
 

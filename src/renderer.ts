@@ -231,11 +231,14 @@ export class TerrainRenderer {
    * Resizes the WebGL viewport and camera aspect ratios on DOM bounds changes.
    */
   resize(): void {
-    const rect = this.canvas.parentElement?.getBoundingClientRect() || { width: 400, height: 300 };
+    const rect = this.canvas.parentElement?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
     this.camera.aspect = rect.width / rect.height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(rect.width, rect.height, false);
+    this.controls.update();
   }
+
 
   /**
    * Disposes of all WebGL and Three.js resources associated with this viewport.

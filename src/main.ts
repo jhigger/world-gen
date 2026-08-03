@@ -72,7 +72,9 @@ const lblErosion = document.getElementById('lbl-erosion') as HTMLElement;
 const iconErosionPlay = document.getElementById('icon-erosion-play') as HTMLElement;
 const iconErosionPause = document.getElementById('icon-erosion-pause') as HTMLElement;
 const toggleWireframe = document.getElementById('toggle-wireframe') as HTMLInputElement;
+const toggleMetrics = document.getElementById('toggle-metrics') as HTMLInputElement | null;
 const btnResetErosion = document.getElementById('btn-reset-erosion') as HTMLButtonElement;
+
 
 const btnBenchmark = document.getElementById('btn-benchmark') as HTMLButtonElement;
 const btnResetDefaults = document.getElementById('btn-reset-defaults') as HTMLButtonElement;
@@ -126,7 +128,12 @@ stateObservable.subscribe((path) => {
     setViewMode(state.viewMode, state.focusedIndex);
     metricsTrackers.forEach(m => m.reset());
   }
+
+  if (path === 'showMetrics') {
+    applyShowMetricsState();
+  }
 });
+
 
 async function initViewports() {
   for (let index = 0; index < availableAlgorithms.length; index++) {
@@ -138,8 +145,27 @@ async function initViewports() {
     }
     const renderer = new TerrainRenderer(canvas, algo);
     await renderer.init();
-    
+
+    const ctrl = renderer.getControls();
+    ctrl.addEventListener('change', () => {
+      if (state.isSyncing || benchmarkSuite.isActive()) return;
+      state.isSyncing = true;
+      try {
+        const sourceCam = renderer.getCamera();
+        const sourceTarget = ctrl.target;
+        renderers.forEach((r, idx) => {
+          if (idx === index || !r) return;
+          r.getCamera().position.copy(sourceCam.position);
+          r.getControls().target.copy(sourceTarget);
+          r.getControls().update();
+        });
+      } finally {
+        state.isSyncing = false;
+      }
+    });
+
     renderer.onStatsUpdate = (stats) => {
+
       metricsTrackers[index].addRenderTime(stats.renderTime);
       metricsTrackers[index].addMathTime(stats.mathTime);
       metricsTrackers[index].addRuggedness(stats.ruggedness);
@@ -208,15 +234,22 @@ function setViewMode(mode: 'grid' | 'single', index: number = 0) {
   if (selectSingleAlgo) {
     selectSingleAlgo.value = mode === 'single' ? index.toString() : '-1';
   }
+  const mainContent = document.querySelector('.main-content');
+  if (mainContent) {
+    if (mode === 'single') {
+      mainContent.classList.add('single-view-active');
+    } else {
+      mainContent.classList.remove('single-view-active');
+    }
+  }
   if (gridContainer) {
     if (mode === 'single') {
       gridContainer.classList.add('single-view');
-      renderers.forEach((r, i) => {
+      renderers.forEach((_, i) => {
         const c = document.getElementById(`card-${i}`);
         if (c) {
           if (i === index) {
             c.classList.add('focused');
-            if (r) r!.resize();
           } else {
             c.classList.remove('focused');
           }
@@ -224,16 +257,67 @@ function setViewMode(mode: 'grid' | 'single', index: number = 0) {
       });
     } else {
       gridContainer.classList.remove('single-view');
-      renderers.forEach((r, i) => {
+      renderers.forEach((_, i) => {
         const c = document.getElementById(`card-${i}`);
         if (c) {
           c.classList.remove('focused');
-          if (r) r!.resize();
         }
       });
     }
   }
+
+
+  // Synchronize Mobile Algo Tabs
+  const mobileAlgoTabs = document.querySelectorAll('.mobile-tab-btn');
+  mobileAlgoTabs.forEach((btn) => {
+    const idxAttr = btn.getAttribute('data-index');
+    if (idxAttr !== null) {
+      const i = parseInt(idxAttr, 10);
+      if (mode === 'single' && i === index) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  });
+
+  // Ensure renderers update camera aspect ratio and OrbitControls after DOM reflow
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      renderers.forEach((r) => {
+        if (r) r.resize();
+      });
+    });
+  });
 }
+
+
+function applyShowMetricsState() {
+  if (toggleMetrics) {
+    toggleMetrics.checked = state.showMetrics;
+  }
+
+  const mobileToggle = document.getElementById('mobile-toggle-metrics');
+  if (mobileToggle) {
+    if (state.showMetrics) {
+      mobileToggle.classList.remove('metrics-off');
+      mobileToggle.textContent = '📊 Stats';
+    } else {
+      mobileToggle.classList.add('metrics-off');
+      mobileToggle.textContent = '📊 Hidden';
+    }
+  }
+
+  if (gridContainer) {
+    if (state.showMetrics) {
+      gridContainer.classList.remove('metrics-hidden');
+    } else {
+      gridContainer.classList.add('metrics-hidden');
+    }
+  }
+}
+
+
 
 
 
@@ -250,9 +334,11 @@ function resetToDefaults() {
  */
 function updateStorage() {
   let snap = undefined;
-  if (!benchmarkSuite.isActive() && renderers[0]) {
-    const cam = renderers[0]!.getCamera();
-    const ctrl = renderers[0]!.getControls();
+  const activeRenderer = (state.viewMode === 'single' && renderers[state.focusedIndex]) ? renderers[state.focusedIndex] : (renderers[0] || renderers.find(r => r !== null));
+  if (!benchmarkSuite.isActive() && activeRenderer) {
+    const cam = activeRenderer.getCamera();
+    const ctrl = activeRenderer.getControls();
+
     const dx = cam.position.x - ctrl.target.x;
     const dy = cam.position.y - ctrl.target.y;
     const dz = cam.position.z - ctrl.target.z;
@@ -577,6 +663,14 @@ function setupUIEvents() {
     state.showWireframe = toggleWireframe.checked;
   });
 
+  // Metrics Overlay Toggle
+  if (toggleMetrics) {
+    toggleMetrics.addEventListener('change', () => {
+      state.showMetrics = toggleMetrics.checked;
+    });
+  }
+
+
   btnResetErosion.addEventListener('click', () => {
   });
 
@@ -657,6 +751,12 @@ function setupHotkeys() {
       toggleWireframe.checked = !toggleWireframe.checked;
       state.showWireframe = toggleWireframe.checked;
     }
+
+    // Key M toggles active Metrics & Math Analysis overlays
+    if (e.key.toLowerCase() === 'm') {
+      state.showMetrics = !state.showMetrics;
+    }
+
 
     // Arrow keys translate the camera and target horizontally (travel/pan)
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -774,9 +874,10 @@ function animationLoop() {
   }
 
   // Apply camera horizontal translation (travel) from held arrow keys
-  if ((state.keysPressed.arrowUp || state.keysPressed.arrowDown || state.keysPressed.arrowLeft || state.keysPressed.arrowRight) && !benchmarkSuite.isActive() && renderers[0]) {
-    const cam = renderers[0]!.getCamera();
-    const ctrl = renderers[0]!.getControls();
+  const activeRenderer = (state.viewMode === 'single' && renderers[state.focusedIndex]) ? renderers[state.focusedIndex] : (renderers[0] || renderers.find(r => r !== null));
+  if ((state.keysPressed.arrowUp || state.keysPressed.arrowDown || state.keysPressed.arrowLeft || state.keysPressed.arrowRight) && !benchmarkSuite.isActive() && activeRenderer) {
+    const cam = activeRenderer.getCamera();
+    const ctrl = activeRenderer.getControls();
 
     const dx = ctrl.target.x - cam.position.x;
     const dz = ctrl.target.z - cam.position.z;
@@ -832,8 +933,8 @@ function animationLoop() {
         try {
           renderers.forEach((r) => {
             if (!r) return;
-            const otherCam = r!.getCamera();
-            const otherCtrl = r!.getControls();
+            const otherCam = r.getCamera();
+            const otherCtrl = r.getControls();
             otherCam.position.x += actualTransX;
             otherCam.position.z += actualTransZ;
             otherCtrl.target.x = state.cameraOffsetX;
@@ -848,14 +949,19 @@ function animationLoop() {
   }
 
   // 1. Apply camera orbit rotation
-  if (state.autoOrbit && !benchmarkSuite.isActive() && renderers.length > 0) {
+  const activeIdx = (state.viewMode === 'single' && state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length)
+    ? state.focusedIndex
+    : 0;
+  const baseRenderer = renderers[activeIdx] || renderers.find(r => r !== null);
+
+  if (state.autoOrbit && !benchmarkSuite.isActive() && baseRenderer) {
     const orbitAngle = dt * 0.12 * state.rotateSpeed; // Rotation speed scaled by user input
     const cos = Math.cos(orbitAngle);
     const sin = Math.sin(orbitAngle);
 
     state.isSyncing = true;
-    const baseCam = renderers[0]!.getCamera();
-    const baseCtrl = renderers[0]!.getControls();
+    const baseCam = baseRenderer.getCamera();
+    const baseCtrl = baseRenderer.getControls();
     
     // Rotate camera around target Y-axis
     const dx = baseCam.position.x - baseCtrl.target.x;
@@ -871,10 +977,10 @@ function animationLoop() {
 
     // Copy rotated coordinates to all other viewports
     renderers.forEach((r, idx) => {
-      if (idx === 0) return;
-      r!.getCamera().position.copy(baseCam.position);
-      r!.getControls().target.copy(baseCtrl.target);
-      r!.getControls().update();
+      if (!r || idx === activeIdx) return;
+      r.getCamera().position.copy(baseCam.position);
+      r.getControls().target.copy(baseCtrl.target);
+      r.getControls().update();
     });
 
     // Update zoom slider readout
@@ -885,6 +991,7 @@ function animationLoop() {
 
     state.isSyncing = false;
   }
+
 
   // 2. Drive benchmark automated path
   if (benchmarkSuite.isActive()) {
@@ -1008,11 +1115,17 @@ function setupTooltips(): void {
     let showTimeout: number | null = null;
 
     item.addEventListener('mouseenter', () => {
+      // Do not display desktop hover tooltips on mobile viewports (<768px) or when mobile parameter modal is open
+      if (window.innerWidth <= 768) return;
+      const modal = document.getElementById('mobile-info-modal');
+      if (modal && !modal.classList.contains('hidden')) return;
+
       // Clear any pending show timeout to avoid duplicate scheduling
       if (showTimeout) {
         window.clearTimeout(showTimeout);
         showTimeout = null;
       }
+
 
       // Schedule tooltip presentation with a delay to prevent intrusive popups during quick swipes
       showTimeout = window.setTimeout(() => {
@@ -1069,6 +1182,280 @@ function setupTooltips(): void {
   });
 }
 
+// ============================================================================
+// MOBILE UI/UX HANDLERS
+// ============================================================================
+function setupMobileUI() {
+  const sidebar = document.getElementById('mobile-sidebar');
+  const sheetHandle = document.getElementById('mobile-sheet-handle');
+  const toggleBtn = document.getElementById('btn-toggle-sheet') as HTMLButtonElement | null;
+  const mobileAlgoTabs = document.querySelectorAll('.mobile-tab-btn');
+  const infoModal = document.getElementById('mobile-info-modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalCloseBtn = document.getElementById('modal-close-btn');
+  const modalBackdrop = document.getElementById('modal-backdrop');
+
+  const isMobile = () => window.innerWidth <= 768;
+
+  // Default to single focused view on mobile screens
+  if (isMobile() && state.viewMode === 'grid') {
+    state.viewMode = 'single';
+    state.focusedIndex = 0;
+    setViewMode('single', 0);
+  }
+
+  const toggleSheet = (e?: Event) => {
+    if (e) e.stopPropagation();
+    if (!sidebar) return;
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    if (isCollapsed) {
+      sidebar.classList.remove('collapsed');
+      sidebar.classList.add('expanded');
+      sidebar.style.transform = '';
+      if (toggleBtn) toggleBtn.textContent = '▼ Hide Controls';
+    } else {
+      sidebar.classList.remove('expanded');
+      sidebar.classList.add('collapsed');
+      sidebar.style.transform = '';
+      if (toggleBtn) toggleBtn.textContent = '▲ Open Controls';
+      sidebar.scrollTop = 0;
+    }
+  };
+
+  const collapseSheet = () => {
+    if (!sidebar) return;
+    if (sidebar.classList.contains('expanded')) {
+      sidebar.classList.remove('expanded');
+      sidebar.classList.add('collapsed');
+      sidebar.style.transform = '';
+      if (toggleBtn) toggleBtn.textContent = '▲ Open Controls';
+      sidebar.scrollTop = 0;
+    }
+  };
+
+
+
+  const gridContainer = document.getElementById('terrain-grid');
+  if (gridContainer) {
+    let canvasTouchStartX = 0;
+    let canvasTouchStartY = 0;
+
+    gridContainer.addEventListener('touchstart', (e: TouchEvent) => {
+      if (!isMobile()) return;
+      canvasTouchStartX = e.touches[0].clientX;
+      canvasTouchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    gridContainer.addEventListener('touchend', (e: TouchEvent) => {
+      if (!isMobile() || !sidebar || !sidebar.classList.contains('expanded')) return;
+      if (e.changedTouches.length > 0) {
+        const endX = e.changedTouches[0].clientX;
+        const endY = e.changedTouches[0].clientY;
+        const dist = Math.hypot(endX - canvasTouchStartX, endY - canvasTouchStartY);
+        if (dist < 12) {
+          collapseSheet();
+        }
+      }
+    }, { passive: true });
+
+    gridContainer.addEventListener('click', () => {
+      if (!isMobile() || !sidebar || !sidebar.classList.contains('expanded')) return;
+      collapseSheet();
+    });
+  }
+
+  if (sheetHandle && sidebar) {
+
+    let sheetStartY = 0;
+    let currentDeltaY = 0;
+    let isDraggingSheet = false;
+
+    sheetHandle.addEventListener('click', (e) => {
+      // Only toggle via click if not coming from a significant touch drag
+      if (Math.abs(currentDeltaY) < 10) {
+        toggleSheet(e);
+      }
+    });
+
+    sheetHandle.addEventListener('touchstart', (e: TouchEvent) => {
+      if (!isMobile()) return;
+      isDraggingSheet = true;
+      sheetStartY = e.touches[0].clientY;
+      currentDeltaY = 0;
+      sidebar.style.transition = 'none';
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e: TouchEvent) => {
+      if (!isDraggingSheet || !sidebar || !isMobile()) return;
+      
+      const currentY = e.touches[0].clientY;
+      currentDeltaY = currentY - sheetStartY;
+      const isCollapsed = sidebar.classList.contains('collapsed');
+
+      if ((isCollapsed && currentDeltaY < 0) || (!isCollapsed && currentDeltaY > 0)) {
+        if (e.cancelable) e.preventDefault();
+      }
+
+      if (isCollapsed) {
+        // Dragging upward (negative deltaY): slide sheet up
+        if (currentDeltaY < 0) {
+          const collapsedOffset = window.innerHeight * 0.75 - 96;
+          const translateY = Math.max(0, collapsedOffset + currentDeltaY);
+          sidebar.style.transform = `translateY(${translateY}px)`;
+        }
+      } else {
+        // Dragging downward (positive deltaY): slide sheet down
+        if (currentDeltaY > 0) {
+          sidebar.style.transform = `translateY(${currentDeltaY}px)`;
+        }
+      }
+    }, { passive: false });
+
+
+    const handleDragEnd = () => {
+      if (!isDraggingSheet || !sidebar) return;
+      isDraggingSheet = false;
+      sidebar.style.transition = '';
+
+      const isCollapsed = sidebar.classList.contains('collapsed');
+
+      if (isCollapsed && currentDeltaY < -30) {
+        sidebar.style.transform = '';
+        sidebar.classList.remove('collapsed');
+        sidebar.classList.add('expanded');
+        if (toggleBtn) toggleBtn.textContent = '▼ Hide Controls';
+      } else if (!isCollapsed && currentDeltaY > 30) {
+        sidebar.style.transform = '';
+        sidebar.classList.remove('expanded');
+        sidebar.classList.add('collapsed');
+        if (toggleBtn) toggleBtn.textContent = '▲ Open Controls';
+      } else {
+        sidebar.style.transform = '';
+      }
+    };
+
+    window.addEventListener('touchend', handleDragEnd);
+    window.addEventListener('touchcancel', handleDragEnd);
+  }
+
+
+  // Mobile Tab Pill Switcher
+  mobileAlgoTabs.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const target = e.currentTarget as HTMLButtonElement;
+      const idxAttr = target.getAttribute('data-index');
+      if (idxAttr !== null) {
+        const idx = parseInt(idxAttr, 10);
+        state.focusedIndex = idx;
+        state.viewMode = 'single';
+        setViewMode('single', idx);
+        
+        mobileAlgoTabs.forEach(b => {
+          if (b.hasAttribute('data-index')) b.classList.remove('active');
+        });
+        target.classList.add('active');
+      }
+    });
+  });
+
+  const mobileToggleMetrics = document.getElementById('mobile-toggle-metrics');
+  if (mobileToggleMetrics) {
+    mobileToggleMetrics.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.showMetrics = !state.showMetrics;
+    });
+  }
+
+
+
+
+  // Inject info targets with Lucide info icon into control groups for mobile parameter modals
+  const tooltipGroups = document.querySelectorAll('.has-tooltip');
+  const lucideInfoSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`;
+
+  tooltipGroups.forEach((group) => {
+    const tooltipBox = group.querySelector('.tooltip-box');
+    if (!tooltipBox) return;
+
+    if (!group.querySelector('.info-btn')) {
+      const label = group.querySelector('.toggle-label, h2, h3, label:not(.switch)');
+      if (label) {
+
+        const infoBtn = document.createElement('button');
+        infoBtn.className = 'info-btn';
+        infoBtn.setAttribute('aria-label', 'Parameter info');
+        infoBtn.setAttribute('type', 'button');
+        infoBtn.innerHTML = lucideInfoSvg;
+        
+        infoBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Instantly dismiss any desktop hover tooltip overlays on screen
+          document.querySelectorAll('.global-tooltip-box').forEach(el => el.remove());
+
+          openInfoModal(tooltipBox);
+        });
+
+
+        label.appendChild(infoBtn);
+      }
+    }
+  });
+
+
+  function openInfoModal(tooltipBox: Element) {
+    if (!infoModal || !modalTitle || !modalBody) return;
+    const titleEl = tooltipBox.querySelector('h5');
+    modalTitle.textContent = titleEl ? titleEl.textContent || 'Parameter Information' : 'Parameter Information';
+    
+    const clone = tooltipBox.cloneNode(true) as HTMLElement;
+    const h5 = clone.querySelector('h5');
+    if (h5) h5.remove();
+
+    modalBody.innerHTML = clone.innerHTML;
+    infoModal.classList.remove('hidden');
+  }
+
+  const closeModal = () => {
+    if (infoModal) infoModal.classList.add('hidden');
+  };
+
+  if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeModal);
+  if (modalBackdrop) modalBackdrop.addEventListener('click', closeModal);
+}
+
+function setupMathAnalysisToggle() {
+  const cards = document.querySelectorAll('.viewport-card');
+  
+  cards.forEach(card => {
+    const metricsBar = card.querySelector('.metrics');
+    if (metricsBar) {
+      metricsBar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isShown = card.classList.contains('show-analysis');
+        document.querySelectorAll('.viewport-card').forEach(c => c.classList.remove('show-analysis'));
+        if (!isShown) {
+          card.classList.add('show-analysis');
+        }
+      });
+    }
+
+    const mathPanel = card.querySelector('.math-analysis');
+    if (mathPanel) {
+      mathPanel.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
+  });
+
+  window.addEventListener('click', () => {
+    document.querySelectorAll('.viewport-card').forEach(c => c.classList.remove('show-analysis'));
+  });
+}
+
 // Window resizing handler
 window.addEventListener('resize', () => {
   renderers.forEach(r => r!.resize());
@@ -1083,6 +1470,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   setupUIEvents();
   setupHotkeys();
   setupTooltips();
+  setupMobileUI();
+  setupMathAnalysisToggle();
 
   // Initial layout sizing pass
   requestAnimationFrame(() => {
@@ -1098,4 +1487,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   });
 });
+
+
 

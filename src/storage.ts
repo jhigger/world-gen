@@ -12,7 +12,9 @@ export function saveConfig(cameraSnapshot?: { zoom: number; yaw: number; pitch: 
     palette: state.activePalette,
     isErosionActive: state.isErosionActive,
     showWireframe: state.showWireframe,
+    showMetrics: state.showMetrics,
     viewMode: state.viewMode,
+
     focusedIndex: state.focusedIndex,
     seed: state.params.seed,
     rotateSpeed: state.rotateSpeed,
@@ -69,7 +71,9 @@ export function loadConfig() {
       if (config.palette) state.activePalette = config.palette as ColorPalette;
       if (typeof config.isErosionActive === 'boolean') state.isErosionActive = config.isErosionActive;
       if (typeof config.showWireframe === 'boolean') state.showWireframe = config.showWireframe;
+      if (typeof config.showMetrics === 'boolean') state.showMetrics = config.showMetrics;
       if (config.viewMode) state.viewMode = config.viewMode as 'grid' | 'single';
+
       if (typeof config.focusedIndex === 'number') state.focusedIndex = config.focusedIndex;
       
       if (typeof config.seed === 'number') state.params.seed = config.seed;

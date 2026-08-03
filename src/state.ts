@@ -12,7 +12,9 @@ export interface TerrainConfig {
   palette: ColorPalette;
   isErosionActive: boolean;
   showWireframe: boolean;
+  showMetrics: boolean;
   viewMode: 'grid' | 'single';
+
   focusedIndex: number;
   seed: number;
   rotateSpeed: number;
@@ -43,7 +45,9 @@ const initialState = {
   activePalette: 'topo' as ColorPalette,
   isErosionActive: false,
   showWireframe: false,
+  showMetrics: true,
   autoOrbit: true,
+
   viewMode: 'grid' as 'grid' | 'single',
   focusedIndex: 0,
   rotateSpeed: 1.0,
