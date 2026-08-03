@@ -91,12 +91,12 @@ const valBenchTime = document.getElementById('bench-time') as HTMLSpanElement;
 
 
 
-const renderers: (TerrainRenderer | null)[] = [null, null, null, null, null];
+const renderers: (TerrainRenderer | null)[] = [null, null, null, null, null, null];
 
 const benchmarkSuite = new BenchmarkSuite();
 const metricsTrackers: PerformanceMetrics[] = [
   new PerformanceMetrics(), new PerformanceMetrics(), new PerformanceMetrics(),
-  new PerformanceMetrics(), new PerformanceMetrics()
+  new PerformanceMetrics(), new PerformanceMetrics(), new PerformanceMetrics()
 ];
 const cachedMetricElements: Record<string, any> = {};
 const hydraulicErosion = new HydraulicErosion();
@@ -381,6 +381,7 @@ function syncDOMToState(): void {
     }
   }
   if (toggleWireframe) toggleWireframe.checked = state.showWireframe;
+  applyShowMetricsState();
   
   if (paramRotateSpeed) paramRotateSpeed.value = state.rotateSpeed.toString();
   if (paramNoiseSpeed) paramNoiseSpeed.value = state.noiseSpeed.toString();
@@ -721,8 +722,8 @@ function setupHotkeys() {
       return;
     }
 
-    // Keys 1 to 5 switch layout to focus isolated algorithm
-    if (e.key >= '1' && e.key <= '5') {
+    // Keys 1 to 6 switch layout to focus isolated algorithm
+    if (e.key >= '1' && e.key <= '6') {
       const idx = parseInt(e.key) - 1;
       if (idx < availableAlgorithms.length) {
         setViewMode('single', idx);

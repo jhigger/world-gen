@@ -28,16 +28,17 @@
         <h2>View & Layout</h2>
         <div class="button-group has-tooltip">
           <button id="btn-grid-view" class="active" title="Hotkey: 0 or `">Compare (Grid)</button>
-          <select id="select-single-algo" title="Hotkey: 1 to 5">
+          <select id="select-single-algo" title="Hotkey: 1 to 6">
             <option value="0">Value Noise (c. 1980)</option>
             <option value="1">Perlin Noise (1983)</option>
             <option value="2">Simplex Noise (2001)</option>
             <option value="3">Worley (Cellular) (1996)</option>
             <option value="4">Fractional Brownian Motion (1968)</option>
+            <option value="5">Gabor Noise (2009)</option>
           </select>
           <div class="tooltip-box">
             <h5>View Mode</h5>
-            <p class="tooltip-desc">Switches the layout between a 5-way comparative grid and a single focused algorithm.</p>
+            <p class="tooltip-desc">Switches the layout between a 6-way comparative grid and a single focused algorithm.</p>
             <p><strong>Grid View:</strong> View all algorithms side-by-side.</p>
             <p><strong>Focused View:</strong> Isolates one algorithm in full detail.</p>
           </div>
@@ -330,7 +331,7 @@
 
         <h3>Keyboard Shortcuts</h3>
         <ul class="hotkeys-list">
-          <li><kbd>1</kbd> - <kbd>5</kbd> : Focus Algorithm</li>
+          <li><kbd>1</kbd> - <kbd>6</kbd> : Focus Algorithm</li>
           <li><kbd>0</kbd> or <kbd>`</kbd> : Comparative View</li>
           <li><kbd>B</kbd> : Toggle Benchmark</li>
           <li><kbd>E</kbd> : Toggle Erosion</li>
@@ -351,6 +352,7 @@
         <button class="mobile-tab-btn" data-index="2">Simplex</button>
         <button class="mobile-tab-btn" data-index="3">Worley</button>
         <button class="mobile-tab-btn" data-index="4">FBM</button>
+        <button class="mobile-tab-btn" data-index="5">Gabor</button>
         <button class="mobile-tab-btn mobile-toggle-metrics-btn" id="mobile-toggle-metrics" title="Toggle Stats Overlay (M)">📊 Stats</button>
       </div>
 
@@ -775,6 +777,91 @@
                 <div class="complexity-grid">
                   <div class="complexity-item"><strong>Time (Vertex):</strong> &Theta;(K)</div>
                   <div class="complexity-item"><strong>Time (Grid):</strong> &Theta;(K &middot; N&sup2;)</div>
+                  <div class="complexity-item"><strong>Space (Aux):</strong> &Theta;(1)</div>
+                  <div class="complexity-item"><strong>Space (Grid):</strong> &Theta;(N&sup2;)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Viewport 6: Gabor Noise -->
+        <div class="viewport-card" id="card-5" data-index="5">
+          <div class="viewport-header">
+            <h3>Gabor Noise (2009)</h3>
+            <span class="badge">Anisotropic</span>
+          </div>
+          <div class="canvas-container">
+            <canvas id="canvas-5"></canvas>
+            <div class="viewport-overlay">
+              <div class="metrics">
+                <div class="metric-item">
+                  <span class="metric-label">FPS</span>
+                  <strong id="fps-5">--</strong>
+                  <span class="metric-avg">/<span id="fps-avg-5">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>FPS (Frames Per Second)</h5>
+                    <p class="tooltip-desc">The frequency at which the simulator renders consecutive images (frames) to the screen.</p>
+                    <p><strong>Calculated:</strong> 1000ms divided by the average frame time.</p>
+                    <p><strong>Represents:</strong> Overall visual fluidity and update frequency.</p>
+                    <p><strong>Significance:</strong> Crucial for measuring interface responsiveness and smooth animation.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Frame</span>
+                  <strong id="frametime-5">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="frametime-avg-5">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Frame Time</h5>
+                    <p class="tooltip-desc">The total time elapsed between two consecutive frame updates, representing the complete frame cycle.</p>
+                    <p><strong>Calculated:</strong> Time delta between successive frames using performance.now().</p>
+                    <p><strong>Represents:</strong> Total CPU/GPU time budget consumed per frame cycle.</p>
+                    <p><strong>Significance:</strong> Must stay below 16.7ms for 60 FPS, or 8.3ms for 120 FPS, to prevent stutter.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Render</span>
+                  <strong id="time-5">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="time-avg-5">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Render Time</h5>
+                    <p class="tooltip-desc">The time spent preparing and drawing the 3D scene using WebGL/Three.js.</p>
+                    <p><strong>Calculated:</strong> Elapsed time of the scene draw and GPU submission sequence.</p>
+                    <p><strong>Represents:</strong> Graphics pipeline workload and CPU-to-GPU command overhead.</p>
+                    <p><strong>Significance:</strong> Identifies draw call bottlenecks, mesh complexity limits, or shader performance issues.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Math</span>
+                  <strong id="math-5">--</strong><span class="unit">ms</span>
+                  <span class="metric-avg">/<span id="math-avg-5">--</span><span class="unit">ms</span></span>
+                  <div class="tooltip-box">
+                    <h5>Math Time</h5>
+                    <p class="tooltip-desc">The time taken by the noise generator or subdivision algorithm to calculate height values.</p>
+                    <p><strong>Calculated:</strong> Execution timing of the height grid calculation block (including erosion steps).</p>
+                    <p><strong>Represents:</strong> Core algorithmic complexity and CPU computation cost.</p>
+                    <p><strong>Significance:</strong> Direct indicator of algorithm efficiency. Lower math times allow higher grid resolutions without freezing.</p>
+                  </div>
+                </div>
+                <div class="metric-item">
+                  <span class="metric-label">Rugged</span>
+                  <strong id="ruggedness-5">--</strong>
+                  <span class="metric-avg">/<span id="ruggedness-avg-5">--</span></span>
+                  <div class="tooltip-box">
+                    <h5>Ruggedness</h5>
+                    <p class="tooltip-desc">The relative physical roughness, slope steepness, or complexity of the terrain surface.</p>
+                    <p><strong>Calculated:</strong> Root-mean-square (RMS) of elevation changes between adjacent grid vertices.</p>
+                    <p><strong>Represents:</strong> Geometric noise intensity and fractal dispersion features.</p>
+                    <p><strong>Significance:</strong> Quantifies the aesthetic variation and geologic realism generated by each algorithm.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="math-analysis">
+                <h4>Mathematical Analysis</h4>
+                <p>Sparse convolution of Gabor kernels combining Gaussian envelopes with sinusoidal oscillations to generate anisotropic, directionally-aligned terrain structures.</p>
+                <div class="complexity-grid">
+                  <div class="complexity-item"><strong>Time (Vertex):</strong> &Theta;(N_imp)</div>
+                  <div class="complexity-item"><strong>Time (Grid):</strong> &Theta;(N_imp &middot; N&sup2;)</div>
                   <div class="complexity-item"><strong>Space (Aux):</strong> &Theta;(1)</div>
                   <div class="complexity-item"><strong>Space (Grid):</strong> &Theta;(N&sup2;)</div>
                 </div>

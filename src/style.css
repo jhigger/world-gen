@@ -606,6 +606,15 @@ kbd {
   padding: 14px;
 }
 
+/* Metrics Hiding & Collapse Styles */
+.metrics-hidden .viewport-overlay {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  transform: translateY(-8px);
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s ease;
+}
+
 .metrics {
   align-self: flex-end;
   background-color: rgba(5, 7, 12, 0.8);
@@ -866,11 +875,11 @@ kbd {
 @media (max-width: 640px) {
   .terrain-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(5, 1fr);
+    grid-template-rows: repeat(6, 1fr);
   }
   .terrain-grid.single-view .viewport-card.focused {
     grid-column: span 1;
-    grid-row: span 5;
+    grid-row: span 6;
   }
 }
 
@@ -1126,14 +1135,7 @@ kbd {
     border: 1px solid rgba(239, 68, 68, 0.4);
   }
 
-/* Metrics Hiding & Collapse Styles */
-.metrics-hidden .viewport-overlay {
-  opacity: 0 !important;
-  pointer-events: none !important;
-  visibility: hidden !important;
-  transform: translateY(-8px);
-  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s ease;
-}
+
 
 
   /* Sidebar transformed into Mobile Control Sheet */
