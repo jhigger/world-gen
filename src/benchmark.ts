@@ -25,7 +25,7 @@ export class PerformanceMetrics {
   private totalRuggednessCount = 0;
 
   /**
-   * Resets all tracked performance metrics.
+   * Resets all tracked performance metrics and cumulative averages for a new configuration run.
    */
   reset(): void {
     this.renderTimes = [];

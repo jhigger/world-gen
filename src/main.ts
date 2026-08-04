@@ -5,6 +5,8 @@ import { HydraulicErosion } from './physics';
 import { TerrainPipeline } from './pipeline';
 import { state, clearHeightmapCaches, resetStateToDefaults } from './state';
 import { saveConfig, loadConfig } from './storage';
+import { OffscreenBenchmarkManager } from './offscreen-benchmark';
+import type { BenchmarkMode, TelemetryPayload } from './worker';
 
 // ============================================================================
 // TYPED CONFIGURATION INTERFACE
@@ -76,12 +78,72 @@ const toggleMetrics = document.getElementById('toggle-metrics') as HTMLInputElem
 const btnResetErosion = document.getElementById('btn-reset-erosion') as HTMLButtonElement;
 
 
+const selectBenchmarkMode = document.getElementById('select-benchmark-mode') as HTMLSelectElement | null;
+const valBenchmarkMode = document.getElementById('val-benchmark-mode') as HTMLSpanElement | null;
+
 const btnBenchmark = document.getElementById('btn-benchmark') as HTMLButtonElement;
 const btnResetDefaults = document.getElementById('btn-reset-defaults') as HTMLButtonElement;
 const panelBenchStatus = document.getElementById('benchmark-status') as HTMLDivElement;
 const valBenchState = document.getElementById('bench-state') as HTMLSpanElement;
 const valBenchFps = document.getElementById('bench-fps') as HTMLSpanElement;
-const valBenchTime = document.getElementById('bench-time') as HTMLSpanElement;
+const valBenchFrametime = document.getElementById('bench-frametime') as HTMLSpanElement;
+const valBenchMathTime = document.getElementById('bench-math-time') as HTMLSpanElement;
+const valBenchGpuTime = document.getElementById('bench-gpu-time') as HTMLSpanElement;
+const valBenchTotalFrames = document.getElementById('bench-total-frames') as HTMLSpanElement;
+
+let offscreenCanvasEl: HTMLCanvasElement | null = null;
+let isOffscreenInitialized = false;
+let latestWorkerTelemetry: TelemetryPayload | null = null;
+
+function ensureOffscreenBenchmarkInitialized(): boolean {
+  if (isOffscreenInitialized) return true;
+  if (!OffscreenBenchmarkManager.isSupported()) return false;
+
+  // Create dedicated offscreen canvas container element if not already present
+  offscreenCanvasEl = document.createElement('canvas');
+  offscreenCanvasEl.id = 'offscreen-benchmark-canvas';
+  offscreenCanvasEl.style.width = '100%';
+  offscreenCanvasEl.style.height = '140px';
+  offscreenCanvasEl.style.borderRadius = '6px';
+  offscreenCanvasEl.style.marginTop = '8px';
+  panelBenchStatus.appendChild(offscreenCanvasEl);
+
+  const activeIdx = state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0;
+  const algoName = availableAlgorithms[activeIdx].name;
+  const selectedMode = (selectBenchmarkMode?.value as BenchmarkMode) || 'offscreen';
+
+  const success = offscreenBenchmark.initialize(
+    offscreenCanvasEl,
+    panelBenchStatus,
+    algoName,
+    state.params,
+    state.resolution,
+    (telemetry) => {
+      latestWorkerTelemetry = telemetry;
+      if (valBenchFps) valBenchFps.textContent = `${telemetry.fps} FPS`;
+      if (valBenchFrametime) {
+        valBenchFrametime.textContent = `${(1000 / telemetry.fps).toFixed(2)} ms`;
+      }
+      if (valBenchMathTime) {
+        valBenchMathTime.textContent = `${telemetry.avgMathTimeMs} ms (min: ${telemetry.minMathTimeMs}ms, max: ${telemetry.maxMathTimeMs}ms)`;
+      }
+      if (valBenchGpuTime) {
+        if (telemetry.mode === 'headless') {
+          valBenchGpuTime.textContent = 'N/A (Headless Math)';
+        } else {
+          valBenchGpuTime.textContent = `${telemetry.avgRenderTimeMs} ms (min: ${telemetry.minRenderTimeMs}ms, max: ${telemetry.maxRenderTimeMs}ms)`;
+        }
+      }
+      if (valBenchTotalFrames) {
+        valBenchTotalFrames.textContent = `${telemetry.totalFrames.toLocaleString()} iterations`;
+      }
+    },
+    selectedMode
+  );
+
+  isOffscreenInitialized = success;
+  return success;
+}
 
 // ============================================================================
 // VIEWPORT INITIALIZATION
@@ -94,6 +156,7 @@ const valBenchTime = document.getElementById('bench-time') as HTMLSpanElement;
 const renderers: (TerrainRenderer | null)[] = [null, null, null, null, null, null];
 
 const benchmarkSuite = new BenchmarkSuite();
+const offscreenBenchmark = new OffscreenBenchmarkManager();
 const metricsTrackers: PerformanceMetrics[] = [
   new PerformanceMetrics(), new PerformanceMetrics(), new PerformanceMetrics(),
   new PerformanceMetrics(), new PerformanceMetrics(), new PerformanceMetrics()
@@ -115,8 +178,30 @@ stateObservable.subscribe((path) => {
   updateUIStrings();
   updateStorage();
   
+  if (
+    path.startsWith('params.') ||
+    path === 'resolution' ||
+    path === 'focusedIndex' ||
+    path === 'viewMode' ||
+    path === 'fpsLimit' ||
+    path === 'customFps' ||
+    path === 'noiseSpeed' ||
+    path === 'rotateSpeed' ||
+    path === 'isErosionActive' ||
+    path === 'activePalette'
+  ) {
+    metricsTrackers.forEach((m) => m.reset());
+    latestWorkerTelemetry = null;
+  }
+
   if (path.startsWith('params.') || path === 'resolution') {
     clearHeightmapCaches();
+  }
+
+  if (offscreenBenchmark.getIsRunning() && (path.startsWith('params') || path === 'resolution' || path === 'focusedIndex')) {
+    const activeIdx = state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0;
+    const algoName = availableAlgorithms[activeIdx].name;
+    offscreenBenchmark.updateParams(algoName, state.resolution, state.params);
   }
 
   // Viewport/Camera subscriptions
@@ -126,7 +211,6 @@ stateObservable.subscribe((path) => {
 
   if (path === 'viewMode' || path === 'focusedIndex') {
     setViewMode(state.viewMode, state.focusedIndex);
-    metricsTrackers.forEach(m => m.reset());
   }
 
   if (path === 'showMetrics') {
@@ -387,6 +471,7 @@ function syncDOMToState(): void {
   if (paramNoiseSpeed) paramNoiseSpeed.value = state.noiseSpeed.toString();
   if (paramFpsLimit) paramFpsLimit.value = state.fpsLimit;
   if (paramCustomFps) paramCustomFps.value = state.customFps.toString();
+  if (valCustomFps) valCustomFps.value = state.customFps.toString();
   if (paramUiScale) paramUiScale.value = state.uiScale.toString();
   if (valUiScale) valUiScale.value = state.uiScale.toString();
 
@@ -537,11 +622,22 @@ function setupUIEvents() {
     }
   });
 
-  // Custom FPS value control
-  paramCustomFps.addEventListener('input', () => {
-    const parsed = parseInt(paramCustomFps.value);
-    state.customFps = isNaN(parsed) || parsed < 1 ? 60 : Math.min(parsed, 240);
-  });
+  // Custom FPS value control (Bidirectional synchronization between range slider and number input)
+  const syncCustomFps = (valStr: string) => {
+    const parsed = parseInt(valStr);
+    const clamped = isNaN(parsed) || parsed < 1 ? 60 : Math.min(parsed, 240);
+    state.customFps = clamped;
+    if (paramCustomFps) paramCustomFps.value = clamped.toString();
+    if (valCustomFps) valCustomFps.value = clamped.toString();
+  };
+
+  if (paramCustomFps) {
+    paramCustomFps.addEventListener('input', () => syncCustomFps(paramCustomFps.value));
+  }
+  if (valCustomFps) {
+    valCustomFps.addEventListener('input', () => syncCustomFps(valCustomFps.value));
+    valCustomFps.addEventListener('change', () => syncCustomFps(valCustomFps.value));
+  }
 
   // Bidirectional synchronization from numeric inputs to range sliders
   valResolution.addEventListener('change', () => {
@@ -683,30 +779,85 @@ function setupUIEvents() {
   btnBenchmark.addEventListener('click', () => {
     toggleBenchmarkMode();
   });
+
+  if (selectBenchmarkMode) {
+    selectBenchmarkMode.addEventListener('change', () => {
+      const mode = selectBenchmarkMode.value as BenchmarkMode;
+      if (valBenchmarkMode) {
+        const modeLabels: Record<string, string> = {
+          offscreen: 'Offscreen WebGL',
+          headless: 'Headless Math',
+          vsync: 'VSync rAF',
+        };
+        valBenchmarkMode.textContent = modeLabels[mode] || mode;
+      }
+      metricsTrackers.forEach((m) => m.reset());
+      latestWorkerTelemetry = null;
+      if (benchmarkSuite.isActive() || offscreenBenchmark.getIsRunning()) {
+        offscreenBenchmark.stop();
+        startBenchmarkForCurrentMode();
+      }
+    });
+  }
+}
+
+function startBenchmarkForCurrentMode(): void {
+  const selectedMode = (selectBenchmarkMode?.value as BenchmarkMode) || 'offscreen';
+  benchmarkSuite.start();
+  metricsTrackers.forEach((t) => t.clear());
+
+  if (selectedMode === 'vsync') {
+    offscreenBenchmark.stop();
+    if (offscreenCanvasEl) {
+      offscreenCanvasEl.style.display = 'none';
+    }
+    valBenchState.textContent = 'Running (VSync rAF Main Thread)';
+  } else {
+    const initialized = ensureOffscreenBenchmarkInitialized();
+    if (initialized) {
+      const activeIdx = state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0;
+      const algoName = availableAlgorithms[activeIdx].name;
+      offscreenBenchmark.updateParams(algoName, state.resolution, state.params, selectedMode);
+      offscreenBenchmark.setMode(selectedMode);
+      offscreenBenchmark.start();
+
+      if (offscreenCanvasEl) {
+        offscreenCanvasEl.style.display = selectedMode === 'offscreen' ? 'block' : 'none';
+      }
+
+      valBenchState.textContent = selectedMode === 'offscreen'
+        ? 'Running (Offscreen WebGL Engine)'
+        : 'Running (Headless Math Engine)';
+    } else {
+      if (offscreenCanvasEl) {
+        offscreenCanvasEl.style.display = 'none';
+      }
+      valBenchState.textContent = 'Running (rAF Fallback)';
+    }
+  }
+
+  btnBenchmark.textContent = 'Stop Benchmark';
+  btnBenchmark.classList.remove('btn-primary');
+  btnBenchmark.classList.add('btn-secondary');
+  panelBenchStatus.classList.remove('hidden');
 }
 
 /**
  * Initiates or aborts the automated camera benchmark sequence.
  */
-function toggleBenchmarkMode() {
-  if (benchmarkSuite.isActive()) {
+function toggleBenchmarkMode(): void {
+  if (benchmarkSuite.isActive() || offscreenBenchmark.getIsRunning()) {
     benchmarkSuite.stop();
+    offscreenBenchmark.stop();
     btnBenchmark.textContent = 'Start Auto-Benchmark';
     btnBenchmark.classList.remove('btn-secondary');
     btnBenchmark.classList.add('btn-primary');
     panelBenchStatus.classList.add('hidden');
     valBenchState.textContent = 'Inactive';
-    
-    metricsTrackers.forEach(t => t.clear());
+
+    metricsTrackers.forEach((t) => t.clear());
   } else {
-    benchmarkSuite.start();
-    btnBenchmark.textContent = 'Stop Benchmark';
-    btnBenchmark.classList.remove('btn-primary');
-    btnBenchmark.classList.add('btn-secondary');
-    panelBenchStatus.classList.remove('hidden');
-    valBenchState.textContent = 'Running...';
-    
-    metricsTrackers.forEach(t => t.clear());
+    startBenchmarkForCurrentMode();
   }
 }
 
@@ -821,6 +972,14 @@ function setupHotkeys() {
 let lastTime = performance.now();
 let lastRenderTime = performance.now();
 
+function updateCardMetricPair(curEl: HTMLElement | null, avgEl: HTMLElement | null, curVal: number | string, avgVal?: number | string, decimals = 2): void {
+  const formatVal = (v: number | string) => typeof v === 'number'
+    ? (v > 0 ? (decimals === 0 ? Math.round(v).toString() : v.toFixed(decimals)) : '--')
+    : v;
+  if (curEl) curEl.textContent = formatVal(curVal);
+  if (avgEl) avgEl.textContent = formatVal(avgVal !== undefined ? avgVal : curVal);
+}
+
 function animationLoop() {
   const now = performance.now();
 
@@ -831,7 +990,7 @@ function animationLoop() {
     const frameInterval = 1000 / targetFps;
     const elapsed = now - lastRenderTime;
 
-    if (elapsed < frameInterval) {
+    if (elapsed < frameInterval - 1.0) {
       requestAnimationFrame(animationLoop);
       return;
     }
@@ -1031,6 +1190,7 @@ function animationLoop() {
   let totalBenchmarkFps = 0;
   let totalBenchmarkFrametime = 0;
   let totalBenchmarkTime = 0;
+  let totalBenchmarkMathTime = 0;
   let activeCount = 0;
 
   for (let i = 0; i < availableAlgorithms.length; i++) {
@@ -1064,22 +1224,30 @@ function animationLoop() {
       const avgRuggedness = metricsTrackers[i].getGlobalAverageRuggedness();
 
       if (els) {
-        if (els.fps) els.fps.textContent = currentFps > 0 ? currentFps.toString() : '--';
-        if (els.frametime) els.frametime.textContent = currentFrametime > 0 ? currentFrametime.toFixed(2) : '--';
-        if (els.time) els.time.textContent = currentRenderTime > 0 ? currentRenderTime.toFixed(2) : '--';
-        if (els.math) els.math.textContent = currentMathTime > 0 ? currentMathTime.toFixed(2) : '--';
-        if (els.ruggedness && stats) els.ruggedness.textContent = stats.ruggedness.toFixed(2);
+        const focusedIdx = state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0;
+        if (offscreenBenchmark.getIsRunning() && i === focusedIdx && latestWorkerTelemetry) {
+          const t = latestWorkerTelemetry;
+          const frameMs = t.fps > 0 ? 1000 / t.fps : 0;
+          const renderMs = t.mode === 'headless' ? '0.00' : t.avgRenderTimeMs;
 
-        if (els.fpsAvg) els.fpsAvg.textContent = avgFps > 0 ? avgFps.toString() : '--';
-        if (els.frametimeAvg) els.frametimeAvg.textContent = avgFrametime > 0 ? avgFrametime.toFixed(2) : '--';
-        if (els.timeAvg) els.timeAvg.textContent = avgRenderTime > 0 ? avgRenderTime.toFixed(2) : '--';
-        if (els.mathAvg) els.mathAvg.textContent = avgMathTime > 0 ? avgMathTime.toFixed(2) : '--';
-        if (els.ruggednessAvg) els.ruggednessAvg.textContent = avgRuggedness > 0 ? avgRuggedness.toFixed(2) : '--';
+          updateCardMetricPair(els.fps, els.fpsAvg, t.fps, t.fps, 0);
+          updateCardMetricPair(els.frametime, els.frametimeAvg, frameMs, frameMs, 2);
+          updateCardMetricPair(els.time, els.timeAvg, renderMs, renderMs, 2);
+          updateCardMetricPair(els.math, els.mathAvg, t.avgMathTimeMs, t.avgMathTimeMs, 2);
+          if (stats) updateCardMetricPair(els.ruggedness, els.ruggednessAvg, stats.ruggedness, stats.ruggedness, 2);
+        } else {
+          updateCardMetricPair(els.fps, els.fpsAvg, currentFps, avgFps, 0);
+          updateCardMetricPair(els.frametime, els.frametimeAvg, currentFrametime, avgFrametime, 2);
+          updateCardMetricPair(els.time, els.timeAvg, currentRenderTime, avgRenderTime, 2);
+          updateCardMetricPair(els.math, els.mathAvg, currentMathTime, avgMathTime, 2);
+          if (stats) updateCardMetricPair(els.ruggedness, els.ruggednessAvg, stats ? stats.ruggedness : '--', avgRuggedness, 2);
+        }
       }
 
       totalBenchmarkFps += currentFps;
       totalBenchmarkFrametime += currentFrametime;
       totalBenchmarkTime += currentRenderTime;
+      totalBenchmarkMathTime += currentMathTime;
       activeCount++;
     }
   }
@@ -1089,11 +1257,15 @@ function animationLoop() {
     const avgFps = Math.round(totalBenchmarkFps / activeCount);
     const avgFrametime = (totalBenchmarkFrametime / activeCount).toFixed(2);
     const avgTime = (totalBenchmarkTime / activeCount).toFixed(2);
+    const avgMath = (totalBenchmarkMathTime / activeCount).toFixed(2);
 
-    valBenchFps.textContent = `${avgFps} FPS`;
-    const valBenchFrametime = document.getElementById('bench-frametime');
-    if (valBenchFrametime) valBenchFrametime.textContent = `${avgFrametime} ms`;
-    valBenchTime.textContent = `${avgTime} ms`;
+    if (!offscreenBenchmark.getIsRunning()) {
+      if (valBenchFps) valBenchFps.textContent = `${avgFps} FPS`;
+      if (valBenchFrametime) valBenchFrametime.textContent = `${avgFrametime} ms`;
+      if (valBenchGpuTime) valBenchGpuTime.textContent = `${avgTime} ms`;
+      if (valBenchMathTime) valBenchMathTime.textContent = `${avgMath} ms`;
+      if (valBenchTotalFrames) valBenchTotalFrames.textContent = `VSync Loop`;
+    }
   }
 
   requestAnimationFrame(animationLoop);

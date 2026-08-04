@@ -285,6 +285,18 @@
             <p><strong>Significance:</strong> Capping frame rates helps reduce CPU/GPU temperatures and power draw, especially on laptops.</p>
           </div>
         </div>
+        <div class="control-group has-tooltip">
+          <label for="select-benchmark-mode">Benchmark Mode: <span id="val-benchmark-mode">Offscreen WebGL</span></label>
+          <select id="select-benchmark-mode">
+            <option value="offscreen">Offscreen WebGL</option>
+            <option value="headless">Headless Math</option>
+            <option value="vsync">VSync rAF</option>
+          </select>
+          <div class="tooltip-box">
+            <h5>Benchmark Mode</h5>
+            <p class="tooltip-desc">Select benchmark execution mode: Offscreen WebGL (unthrottled worker GPU loop with gl.finish), Headless Math (raw worker CPU noise throughput), or VSync rAF (main thread animation loop).</p>
+          </div>
+        </div>
         <div class="control-group hidden has-tooltip" id="custom-fps-container">
           <label for="param-custom-fps">Custom FPS Cap: <input type="number" id="val-custom-fps" class="val-input" min="15" max="240" step="5" value="60"></label>
           <input type="range" id="param-custom-fps" min="15" max="240" step="5" value="60">
@@ -301,10 +313,12 @@
           </div>
         </button>
         <div id="benchmark-status" class="benchmark-status-panel hidden">
-          <p>State: <span id="bench-state">Inactive</span></p>
-          <p>Average FPS: <span id="bench-fps">-</span></p>
-          <p>Avg Frame Time: <span id="bench-frametime">-</span></p>
-          <p>Avg Render Time: <span id="bench-time">-</span></p>
+          <p>Engine State: <span id="bench-state">Inactive</span></p>
+          <p>Uncapped Throughput: <span id="bench-fps" class="metric-highlight">-</span></p>
+          <p>Uncapped Frame Time: <span id="bench-frametime">-</span></p>
+          <p>CPU Math Time: <span id="bench-math-time">-</span></p>
+          <p>GPU Render Time: <span id="bench-gpu-time">-</span></p>
+          <p>Total Iterations: <span id="bench-total-frames">-</span></p>
         </div>
         <button id="btn-reset-defaults" class="btn-secondary has-tooltip">
           Reset to Default

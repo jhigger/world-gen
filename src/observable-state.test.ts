@@ -30,9 +30,10 @@ describe('ObservableState', () => {
     observable.subscribe(listener);
 
     observable.data.items.push(3);
-    // push modifies the array index '2' and 'length' property
+    // push sets index '2' to 3 (notifying 'items.2').
+    // Duplicate length notification is suppressed because array length already matches new length.
+    expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith('items.2', 3);
-    expect(listener).toHaveBeenCalledWith('items.length', 3);
   });
 
   it('can unsubscribe from events', () => {
