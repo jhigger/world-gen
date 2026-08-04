@@ -19,6 +19,20 @@ export interface RenderStats {
   maxElevation: number;
 }
 
+function areParamsEqual(p1: TerrainParams | null, p2: TerrainParams): boolean {
+  if (!p1) return false;
+  return (
+    p1.scale === p2.scale &&
+    p1.octaves === p2.octaves &&
+    p1.persistence === p2.persistence &&
+    p1.heightScale === p2.heightScale &&
+    p1.widthScale === p2.widthScale &&
+    p1.seed === p2.seed &&
+    p1.offsetX === p2.offsetX &&
+    p1.offsetY === p2.offsetY
+  );
+}
+
 /**
  * Three.js WebGL Terrain Renderer.
  * 
@@ -64,72 +78,12 @@ export class TerrainRenderer {
   };
 
   public onStatsUpdate?: (stats: RenderStats) => void;
-  private worker?: Worker;
-  private isGenerating: boolean = false;
-  private nextRenderParams: any = null;
 
   async init(): Promise<void> {}
 
   constructor(canvas: HTMLCanvasElement, algorithm: TerrainAlgorithm) {
     this.canvas = canvas;
     this.algorithm = algorithm;
-
-    if (window.Worker) {
-      this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
-      this.worker.onmessage = (e) => {
-        if (!this.geometry) return;
-        
-        const { heights, colors, minElevation, maxElevation, ruggedness, mathTime } = e.data;
-        
-        const positions = this.geometry.attributes.position.array as Float32Array;
-        
-        // Safeguard: If resolution changed while worker was running, lengths won't match.
-        // Discard this stale frame to prevent RangeError during typed array .set().
-        if (heights.length * 3 !== positions.length) {
-          this.isGenerating = false;
-          if (this.nextRenderParams) {
-            const req = this.nextRenderParams;
-            this.nextRenderParams = null;
-            this.dispatchWorker(req.params, req.resolution, req.palette, req.heightScale);
-          }
-          return;
-        }
-        
-        // The worker returns 'heights' which map to the Z coordinates (idx * 3 + 2)
-        for (let i = 0; i < heights.length; i++) {
-          positions[i * 3 + 2] = heights[i];
-        }
-        
-        this.geometry.attributes.position.needsUpdate = true;
-        
-        const colorArray = this.geometry.attributes.color.array as Float32Array;
-        colorArray.set(colors);
-        this.geometry.attributes.color.needsUpdate = true;
-        
-        this.geometry.computeVertexNormals();
-        
-        const totalTime = performance.now() - this.lastRenderCache.startTime!;
-        
-        if (this.onStatsUpdate) {
-          this.onStatsUpdate({
-            renderTime: totalTime,
-            mathTime,
-            ruggedness,
-            minElevation,
-            maxElevation
-          });
-        }
-        
-        this.isGenerating = false;
-        
-        // If there's a pending request, start it now
-        if (this.nextRenderParams) {
-          const req = this.nextRenderParams;
-          this.nextRenderParams = null;
-          this.dispatchWorker(req.params, req.resolution, req.palette, req.heightScale);
-        }
-      };
-    }
 
     // 1. Create WebGL Scene
     this.scene = new THREE.Scene();
@@ -259,19 +213,7 @@ export class TerrainRenderer {
     }
   }
 
-  /**
-   * Dispatches the height generation math to the web worker to prevent blocking the main thread.
-   */
-  private dispatchWorker(params: TerrainParams, resolution: number, palette: ColorPalette, heightScale: number) {
-    this.isGenerating = true;
-    this.worker!.postMessage({
-      algorithmName: this.algorithm.name,
-      params: { ...params }, // Unpack from potential Proxy (ObservableState) to avoid DataCloneError
-      resolution,
-      palette,
-      heightScale
-    });
-  }
+
 
   /**
    * Generates or retrieves the heightmap mesh and returns render statistics.
@@ -286,7 +228,7 @@ export class TerrainRenderer {
 
     // 2. Check if we need to recalculate geometry and metrics
     const cache = this.lastRenderCache;
-    const paramsChanged = !this.lastParams || JSON.stringify(params) !== JSON.stringify(this.lastParams);
+    const paramsChanged = !areParamsEqual(this.lastParams, params);
     
     const isDirty = forceDirty ||
                     paramsChanged ||
@@ -338,42 +280,16 @@ export class TerrainRenderer {
 
     // 4. Update height map vertices and colors ONLY if properties changed
     if (isDirty) {
-      if (!hasCustomMap && this.worker) {
-        // Dispatch to worker
-        if (this.isGenerating) {
-          this.nextRenderParams = { params: { ...params }, resolution, palette, heightScale: params.heightScale };
-          this.lastParams = JSON.parse(JSON.stringify(params));
-        } else {
-          this.dispatchWorker(params, resolution, palette, params.heightScale);
-          
-          this.lastRenderCache = {
-            resolution,
-            heightScale: params.heightScale,
-            palette,
-            heightmapRef: null,
-            widthScale: params.widthScale,
-            ruggedness,
-            minElevation,
-            maxElevation,
-            startTime
-          };
-          this.lastParams = JSON.parse(JSON.stringify(params));
-        }
-      } else {
-        // Synchronous path (for customHeightmap or fallback)
-        const positions = this.geometry.attributes.position.array as Float32Array;
-        const colors = this.geometry.attributes.color.array as Float32Array;
+      const positions = this.geometry.attributes.position.array as Float32Array;
+      const colors = this.geometry.attributes.color.array as Float32Array;
       
       const positionAttr = this.geometry.attributes.position;
       const colorAttr = this.geometry.attributes.color;
 
-      if (!hasCustomMap) {
-        this.algorithm.generate(0, 0, params);
-      }
-
       let sum = 0;
       let sumSq = 0;
       let count = 0;
+      const mathStart = performance.now();
 
       for (let y = 0; y < resolution; y++) {
         for (let x = 0; x < resolution; x++) {
@@ -396,6 +312,7 @@ export class TerrainRenderer {
         }
       }
 
+      const mathTime = performance.now() - mathStart;
       const mean = sum / count;
       ruggedness = Math.sqrt(Math.max(0, (sumSq / count) - (mean * mean)));
       
@@ -414,7 +331,16 @@ export class TerrainRenderer {
         maxElevation,
         startTime
       };
-      this.lastParams = JSON.parse(JSON.stringify(params));
+      this.lastParams = { ...params };
+
+      if (this.onStatsUpdate) {
+        this.onStatsUpdate({
+          renderTime: performance.now() - startTime,
+          mathTime,
+          ruggedness,
+          minElevation,
+          maxElevation
+        });
       }
     }
 

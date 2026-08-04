@@ -11,6 +11,8 @@ export interface TerrainConfig {
   persistence: number;
   palette: ColorPalette;
   isErosionActive: boolean;
+  erosionDuration: string;
+  benchmarkDuration: number;
   showWireframe: boolean;
   showMetrics: boolean;
   viewMode: 'grid' | 'single';
@@ -44,6 +46,8 @@ const initialState = {
   resolution: 120,
   activePalette: 'topo' as ColorPalette,
   isErosionActive: false,
+  erosionDuration: 'infinite' as string,
+  benchmarkDuration: 10,
   showWireframe: false,
   showMetrics: true,
   autoOrbit: true,
@@ -97,6 +101,8 @@ export function resetStateToDefaults() {
   state.resolution = 120;
   state.activePalette = 'topo';
   state.isErosionActive = false;
+  state.erosionDuration = 'infinite';
+  state.benchmarkDuration = 10;
   state.showWireframe = false;
   state.autoOrbit = true;
   state.viewMode = 'grid';

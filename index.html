@@ -244,6 +244,24 @@
       <div class="control-section">
         <h2>Physical Simulation (Erosion)</h2>
         <div class="control-group has-tooltip">
+          <label for="select-erosion-duration">Erosion Duration: <span id="val-erosion-duration">Infinite</span></label>
+          <select id="select-erosion-duration">
+            <option value="5">5s</option>
+            <option value="10">10s</option>
+            <option value="15">15s</option>
+            <option value="30">30s</option>
+            <option value="infinite" selected>Infinite</option>
+          </select>
+          <div class="tooltip-box">
+            <h5>Erosion Duration</h5>
+            <p class="tooltip-desc">Sets the target duration for continuous hydraulic erosion simulation before automatically pausing.</p>
+          </div>
+        </div>
+        <div class="erosion-status-badge hidden" id="erosion-status-badge">
+          <span class="badge-dot"></span>
+          <span id="lbl-erosion-progress">Eroding... 0.0s</span>
+        </div>
+        <div class="control-group has-tooltip">
           <button id="toggle-erosion" class="btn-primary" style="margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;">
             <svg id="icon-erosion-play" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
             <svg id="icon-erosion-pause" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
@@ -267,6 +285,19 @@
 
       <div class="control-section">
         <h2>Performance & Limits</h2>
+        <div class="control-group has-tooltip">
+          <label for="select-benchmark-duration">Benchmark Duration: <span id="val-benchmark-duration">10s</span></label>
+          <select id="select-benchmark-duration">
+            <option value="5">5s</option>
+            <option value="10" selected>10s</option>
+            <option value="15">15s</option>
+            <option value="30">30s</option>
+          </select>
+          <div class="tooltip-box">
+            <h5>Benchmark Duration</h5>
+            <p class="tooltip-desc">Duration of automated camera flight track for recording performance metrics.</p>
+          </div>
+        </div>
         <div class="control-group has-tooltip">
           <label for="param-fps-limit">FPS Cap: <span id="val-fps-limit">Uncapped</span></label>
           <select id="param-fps-limit">
@@ -897,6 +928,40 @@
         <button class="modal-close-btn" id="modal-close-btn" aria-label="Close modal">✕</button>
       </div>
       <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Benchmark Results Bar Graph Modal -->
+  <div id="benchmark-results-modal" class="benchmark-results-modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" id="benchmark-modal-backdrop"></div>
+    <div class="modal-card benchmark-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3>📊 Benchmark Results</h3>
+          <span class="benchmark-note-tag">FPS (higher is better)</span>
+        </div>
+        <button class="modal-close-btn" id="benchmark-modal-close" aria-label="Close modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="benchmark-summary-header">
+          <p class="benchmark-desc">
+            Comparing <strong>Average FPS</strong> against <strong>1% Low FPS</strong> (99th percentile frame duration). 
+            Higher values indicate smoother animation. Smaller gaps between Average and 1% Low indicate better frame pacing stability.
+          </p>
+          <div class="benchmark-chart-legend">
+            <span class="legend-item"><span class="legend-swatch avg-swatch"></span> Average FPS</span>
+            <span class="legend-item"><span class="legend-swatch low-swatch"></span> 1% Low FPS</span>
+          </div>
+        </div>
+        
+        <div id="benchmark-chart-container" class="benchmark-chart-container">
+          <!-- Rendered dynamically by JS -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-re-benchmark" class="btn-primary">Run Again</button>
+        <button id="btn-close-benchmark-modal" class="btn-secondary">Close</button>
+      </div>
     </div>
   </div>
 

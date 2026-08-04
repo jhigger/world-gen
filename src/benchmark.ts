@@ -10,9 +10,15 @@ import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js
 export class PerformanceMetrics {
   private renderTimes: number[] = [];
   private frameTimes: number[] = [];
+  private allFrameTimes: number[] = [];
   private mathTimes: number[] = [];
   private lastFrameTime = 0;
   private readonly maxSamples = 30; // Sample window rolling size
+  private readonly maxAllSamples = 500; // Max sample window for 1% low calculations
+  private frameIndex = 0;
+  private allFrameIndex = 0;
+  private renderIndex = 0;
+  private mathIndex = 0;
 
   // Cumulative tracking variables for global averages
   private totalFrameTimeSum = 0;
@@ -30,8 +36,13 @@ export class PerformanceMetrics {
   reset(): void {
     this.renderTimes = [];
     this.frameTimes = [];
+    this.allFrameTimes = [];
     this.mathTimes = [];
     this.lastFrameTime = 0;
+    this.frameIndex = 0;
+    this.allFrameIndex = 0;
+    this.renderIndex = 0;
+    this.mathIndex = 0;
     this.totalFrameTimeSum = 0;
     this.totalFrameTimeCount = 0;
     this.totalRenderTimeSum = 0;
@@ -49,9 +60,17 @@ export class PerformanceMetrics {
     const now = performance.now();
     if (this.lastFrameTime > 0) {
       const delta = now - this.lastFrameTime;
-      this.frameTimes.push(delta);
-      if (this.frameTimes.length > this.maxSamples) {
-        this.frameTimes.shift();
+      if (this.frameTimes.length < this.maxSamples) {
+        this.frameTimes.push(delta);
+      } else {
+        this.frameTimes[this.frameIndex] = delta;
+        this.frameIndex = (this.frameIndex + 1) % this.maxSamples;
+      }
+      if (this.allFrameTimes.length < this.maxAllSamples) {
+        this.allFrameTimes.push(delta);
+      } else {
+        this.allFrameTimes[this.allFrameIndex] = delta;
+        this.allFrameIndex = (this.allFrameIndex + 1) % this.maxAllSamples;
       }
       this.totalFrameTimeSum += delta;
       this.totalFrameTimeCount++;
@@ -64,9 +83,11 @@ export class PerformanceMetrics {
    * @param ms Execution duration in milliseconds.
    */
   addRenderTime(ms: number): void {
-    this.renderTimes.push(ms);
-    if (this.renderTimes.length > this.maxSamples) {
-      this.renderTimes.shift();
+    if (this.renderTimes.length < this.maxSamples) {
+      this.renderTimes.push(ms);
+    } else {
+      this.renderTimes[this.renderIndex] = ms;
+      this.renderIndex = (this.renderIndex + 1) % this.maxSamples;
     }
     this.totalRenderTimeSum += ms;
     this.totalRenderTimeCount++;
@@ -77,9 +98,11 @@ export class PerformanceMetrics {
    * @param ms Math duration in milliseconds.
    */
   addMathTime(ms: number): void {
-    this.mathTimes.push(ms);
-    if (this.mathTimes.length > this.maxSamples) {
-      this.mathTimes.shift();
+    if (this.mathTimes.length < this.maxSamples) {
+      this.mathTimes.push(ms);
+    } else {
+      this.mathTimes[this.mathIndex] = ms;
+      this.mathIndex = (this.mathIndex + 1) % this.maxSamples;
     }
     this.totalMathTimeSum += ms;
     this.totalMathTimeCount++;
@@ -143,6 +166,34 @@ export class PerformanceMetrics {
   }
 
   /**
+   * Helper function to compute 99th percentile frame duration in milliseconds.
+   */
+  private getP99FrameTime(): number {
+    const samples = this.allFrameTimes.length > 0 ? this.allFrameTimes : this.frameTimes;
+    if (samples.length === 0) return 0;
+    const sorted = [...samples].sort((a, b) => a - b);
+    const rank = Math.ceil(sorted.length * 0.99) - 1;
+    const idx = Math.max(0, Math.min(rank, sorted.length - 1));
+    return sorted[idx];
+  }
+
+  /**
+   * Calculates 1% Low FPS based on the 99th percentile frame time (worst 1% frame pacing).
+   */
+  getGlobalOnePercentLowFPS(): number {
+    const p99FrameTime = this.getP99FrameTime();
+    return p99FrameTime > 0 ? Math.round(1000 / p99FrameTime) : 0;
+  }
+
+  /**
+   * Retrieves the 99th percentile frame time duration in milliseconds.
+   */
+  getGlobalOnePercentLowFrameTime(): number {
+    const p99FrameTime = this.getP99FrameTime();
+    return parseFloat(p99FrameTime.toFixed(2));
+  }
+
+  /**
    * Retrieves global average frame duration in milliseconds since start/reset.
    */
   getGlobalAverageFrameTime(): number {
@@ -185,18 +236,7 @@ export class PerformanceMetrics {
    * Clears rolling arrays and cumulative counters for a fresh test run.
    */
   clear(): void {
-    this.renderTimes = [];
-    this.frameTimes = [];
-    this.mathTimes = [];
-    this.lastFrameTime = 0;
-    this.totalFrameTimeSum = 0;
-    this.totalFrameTimeCount = 0;
-    this.totalRenderTimeSum = 0;
-    this.totalRenderTimeCount = 0;
-    this.totalMathTimeSum = 0;
-    this.totalMathTimeCount = 0;
-    this.totalRuggednessSum = 0;
-    this.totalRuggednessCount = 0;
+    this.reset();
   }
 }
 

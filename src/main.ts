@@ -69,6 +69,11 @@ const valFpsLimit = document.getElementById('val-fps-limit') as HTMLSpanElement;
 const valCustomFps = document.getElementById('val-custom-fps') as HTMLInputElement;
 const valUiScale = document.getElementById('val-ui-scale') as HTMLInputElement;
 
+const selectErosionDuration = document.getElementById('select-erosion-duration') as HTMLSelectElement | null;
+const valErosionDuration = document.getElementById('val-erosion-duration') as HTMLSpanElement | null;
+const erosionStatusBadge = document.getElementById('erosion-status-badge') as HTMLDivElement | null;
+const lblErosionProgress = document.getElementById('lbl-erosion-progress') as HTMLSpanElement | null;
+
 const toggleErosion = document.getElementById('toggle-erosion') as HTMLButtonElement;
 const lblErosion = document.getElementById('lbl-erosion') as HTMLElement;
 const iconErosionPlay = document.getElementById('icon-erosion-play') as HTMLElement;
@@ -77,7 +82,8 @@ const toggleWireframe = document.getElementById('toggle-wireframe') as HTMLInput
 const toggleMetrics = document.getElementById('toggle-metrics') as HTMLInputElement | null;
 const btnResetErosion = document.getElementById('btn-reset-erosion') as HTMLButtonElement;
 
-
+const selectBenchmarkDuration = document.getElementById('select-benchmark-duration') as HTMLSelectElement | null;
+const valBenchmarkDuration = document.getElementById('val-benchmark-duration') as HTMLSpanElement | null;
 const selectBenchmarkMode = document.getElementById('select-benchmark-mode') as HTMLSelectElement | null;
 const valBenchmarkMode = document.getElementById('val-benchmark-mode') as HTMLSpanElement | null;
 
@@ -90,6 +96,16 @@ const valBenchFrametime = document.getElementById('bench-frametime') as HTMLSpan
 const valBenchMathTime = document.getElementById('bench-math-time') as HTMLSpanElement;
 const valBenchGpuTime = document.getElementById('bench-gpu-time') as HTMLSpanElement;
 const valBenchTotalFrames = document.getElementById('bench-total-frames') as HTMLSpanElement;
+
+const benchmarkResultsModal = document.getElementById('benchmark-results-modal') as HTMLDivElement | null;
+const benchmarkModalBackdrop = document.getElementById('benchmark-modal-backdrop') as HTMLDivElement | null;
+const benchmarkModalClose = document.getElementById('benchmark-modal-close') as HTMLButtonElement | null;
+const btnCloseBenchmarkModal = document.getElementById('btn-close-benchmark-modal') as HTMLButtonElement | null;
+const btnReBenchmark = document.getElementById('btn-re-benchmark') as HTMLButtonElement | null;
+const benchmarkChartContainer = document.getElementById('benchmark-chart-container') as HTMLDivElement | null;
+
+let erosionElapsedTime = 0;
+let benchmarkElapsedTime = 0;
 
 let offscreenCanvasEl: HTMLCanvasElement | null = null;
 let isOffscreenInitialized = false;
@@ -120,23 +136,6 @@ function ensureOffscreenBenchmarkInitialized(): boolean {
     state.resolution,
     (telemetry) => {
       latestWorkerTelemetry = telemetry;
-      if (valBenchFps) valBenchFps.textContent = `${telemetry.fps} FPS`;
-      if (valBenchFrametime) {
-        valBenchFrametime.textContent = `${(1000 / telemetry.fps).toFixed(2)} ms`;
-      }
-      if (valBenchMathTime) {
-        valBenchMathTime.textContent = `${telemetry.avgMathTimeMs} ms (min: ${telemetry.minMathTimeMs}ms, max: ${telemetry.maxMathTimeMs}ms)`;
-      }
-      if (valBenchGpuTime) {
-        if (telemetry.mode === 'headless') {
-          valBenchGpuTime.textContent = 'N/A (Headless Math)';
-        } else {
-          valBenchGpuTime.textContent = `${telemetry.avgRenderTimeMs} ms (min: ${telemetry.minRenderTimeMs}ms, max: ${telemetry.maxRenderTimeMs}ms)`;
-        }
-      }
-      if (valBenchTotalFrames) {
-        valBenchTotalFrames.textContent = `${telemetry.totalFrames.toLocaleString()} iterations`;
-      }
     },
     selectedMode
   );
@@ -473,7 +472,17 @@ function syncDOMToState(): void {
   if (paramCustomFps) paramCustomFps.value = state.customFps.toString();
   if (valCustomFps) valCustomFps.value = state.customFps.toString();
   if (paramUiScale) paramUiScale.value = state.uiScale.toString();
-  if (valUiScale) valUiScale.value = state.uiScale.toString();
+  if (selectErosionDuration) {
+    selectErosionDuration.value = state.erosionDuration || 'infinite';
+    if (valErosionDuration) {
+      const selectedOpt = selectErosionDuration.options[selectErosionDuration.selectedIndex];
+      valErosionDuration.textContent = selectedOpt ? selectedOpt.text : state.erosionDuration;
+    }
+  }
+  if (selectBenchmarkDuration) {
+    selectBenchmarkDuration.value = (state.benchmarkDuration || 10).toString();
+    if (valBenchmarkDuration) valBenchmarkDuration.textContent = `${state.benchmarkDuration || 10}s`;
+  }
 
   applyUiScale();
 
@@ -742,15 +751,47 @@ function setupUIEvents() {
     applyUiScale();
   });
 
-  // Hydraulic Erosion Toggle
+  // Hydraulic Erosion Duration & Controls
+  if (selectErosionDuration) {
+    selectErosionDuration.addEventListener('change', () => {
+      state.erosionDuration = selectErosionDuration.value;
+      if (valErosionDuration) {
+        const selectedOpt = selectErosionDuration.options[selectErosionDuration.selectedIndex];
+        valErosionDuration.textContent = selectedOpt ? selectedOpt.text : state.erosionDuration;
+      }
+    });
+  }
+
   toggleErosion.addEventListener('click', () => {
-    // Toggles the erosion simulation running state.
     state.isErosionActive = !state.isErosionActive;
+    if (state.isErosionActive) {
+      if (state.erosionDuration !== 'infinite') {
+        const targetSec = parseFloat(state.erosionDuration);
+        if (erosionElapsedTime >= targetSec) {
+          erosionElapsedTime = 0;
+        }
+      }
+      if (erosionStatusBadge) erosionStatusBadge.classList.remove('hidden');
+    }
+    syncErosionButtonUI();
   });
 
   if (btnResetErosion) {
     btnResetErosion.addEventListener('click', () => {
       clearHeightmapCaches();
+      erosionElapsedTime = 0;
+      if (erosionStatusBadge) erosionStatusBadge.classList.add('hidden');
+      syncErosionButtonUI();
+    });
+  }
+
+  // Benchmark Duration Selection
+  if (selectBenchmarkDuration) {
+    selectBenchmarkDuration.addEventListener('change', () => {
+      state.benchmarkDuration = parseInt(selectBenchmarkDuration.value) || 10;
+      if (valBenchmarkDuration) {
+        valBenchmarkDuration.textContent = `${state.benchmarkDuration}s`;
+      }
     });
   }
 
@@ -766,10 +807,6 @@ function setupUIEvents() {
       state.showMetrics = toggleMetrics.checked;
     });
   }
-
-
-  btnResetErosion.addEventListener('click', () => {
-  });
 
   btnResetDefaults.addEventListener('click', () => {
     resetToDefaults();
@@ -799,10 +836,131 @@ function setupUIEvents() {
       }
     });
   }
+
+  // Benchmark Results Modal Controls
+  if (benchmarkModalClose) {
+    benchmarkModalClose.addEventListener('click', () => closeBenchmarkResultsModal());
+  }
+  if (btnCloseBenchmarkModal) {
+    btnCloseBenchmarkModal.addEventListener('click', () => closeBenchmarkResultsModal());
+  }
+  if (benchmarkModalBackdrop) {
+    benchmarkModalBackdrop.addEventListener('click', () => closeBenchmarkResultsModal());
+  }
+  if (btnReBenchmark) {
+    btnReBenchmark.addEventListener('click', () => {
+      closeBenchmarkResultsModal();
+      startBenchmarkForCurrentMode();
+    });
+  }
+}
+
+function syncErosionButtonUI(): void {
+  if (!toggleErosion) return;
+  if (state.isErosionActive) {
+    if (lblErosion) lblErosion.textContent = 'Pause Erosion';
+    if (iconErosionPlay) iconErosionPlay.style.display = 'none';
+    if (iconErosionPause) iconErosionPause.style.display = 'block';
+  } else {
+    if (lblErosion) lblErosion.textContent = erosionElapsedTime > 0 ? 'Resume Erosion' : 'Play Erosion';
+    if (iconErosionPlay) iconErosionPlay.style.display = 'block';
+    if (iconErosionPause) iconErosionPause.style.display = 'none';
+  }
+}
+
+function openBenchmarkResultsModal(): void {
+  if (!benchmarkChartContainer || !benchmarkResultsModal) return;
+
+  const algoCategories = ['Lattice', 'Standard', 'Optimal', 'Voronoi', 'Anisotropic', 'Anisotropic'];
+
+  let maxFps = 60;
+  const metricsData = availableAlgorithms.map((algo, i) => {
+    const tracker = metricsTrackers[i];
+    let avgFps = tracker ? tracker.getGlobalAverageFPS() : 0;
+    let lowFps = tracker ? tracker.getGlobalOnePercentLowFPS() : 0;
+    let avgFrameMs = tracker ? tracker.getGlobalAverageFrameTime() : 0;
+    let lowFrameMs = tracker ? tracker.getGlobalOnePercentLowFrameTime() : 0;
+
+    // Fallback if offscreen telemetry was active on focused algorithm
+    if (avgFps === 0 && latestWorkerTelemetry && i === state.focusedIndex) {
+      const t = latestWorkerTelemetry;
+      avgFps = Math.round(t.fps);
+      const maxFrameMs = t.maxMathTimeMs + t.maxRenderTimeMs;
+      lowFps = maxFrameMs > 0 ? Math.round(1000 / maxFrameMs) : avgFps;
+      avgFrameMs = avgFps > 0 ? parseFloat((1000 / avgFps).toFixed(2)) : 0;
+      lowFrameMs = maxFrameMs > 0 ? parseFloat(maxFrameMs.toFixed(2)) : avgFrameMs;
+    }
+
+    if (avgFps > maxFps) maxFps = avgFps;
+    if (lowFps > maxFps) maxFps = lowFps;
+
+    return {
+      name: algo.name,
+      badge: algoCategories[i % algoCategories.length] || 'Noise',
+      avgFps,
+      lowFps,
+      avgFrameMs,
+      lowFrameMs,
+    };
+  });
+
+  const chartRowsHtml = metricsData.map((d) => {
+    const avgPct = Math.max(6, Math.min(100, (d.avgFps / maxFps) * 100));
+    const lowPct = Math.max(6, Math.min(100, (d.lowFps / maxFps) * 100));
+
+    return `
+      <div class="chart-row">
+        <div class="chart-algo-header">
+          <span class="chart-algo-name">${d.name}</span>
+          <span class="chart-algo-badge">${d.badge}</span>
+        </div>
+        <div class="bar-pair">
+          <div class="bar-wrapper">
+            <span class="bar-label">Average</span>
+            <div class="bar-track">
+              <div class="bar bar-avg" style="width: ${avgPct}%;">
+                <span class="bar-value">${d.avgFps} FPS (${d.avgFrameMs}ms)</span>
+              </div>
+            </div>
+          </div>
+          <div class="bar-wrapper">
+            <span class="bar-label">1% Low</span>
+            <div class="bar-track">
+              <div class="bar bar-low" style="width: ${lowPct}%;">
+                <span class="bar-value">${d.lowFps} FPS (${d.lowFrameMs}ms)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  benchmarkChartContainer.innerHTML = chartRowsHtml;
+  benchmarkResultsModal.classList.remove('hidden');
+}
+
+function closeBenchmarkResultsModal(): void {
+  if (benchmarkResultsModal) {
+    benchmarkResultsModal.classList.add('hidden');
+  }
+}
+
+function stopBenchmarkAndShowModal(): void {
+  benchmarkSuite.stop();
+  offscreenBenchmark.stop();
+  btnBenchmark.textContent = 'Start Auto-Benchmark';
+  btnBenchmark.classList.remove('btn-secondary');
+  btnBenchmark.classList.add('btn-primary');
+  panelBenchStatus.classList.add('hidden');
+  valBenchState.textContent = 'Inactive';
+
+  openBenchmarkResultsModal();
 }
 
 function startBenchmarkForCurrentMode(): void {
   const selectedMode = (selectBenchmarkMode?.value as BenchmarkMode) || 'offscreen';
+  benchmarkElapsedTime = 0;
   benchmarkSuite.start();
   metricsTrackers.forEach((t) => t.clear());
 
@@ -847,16 +1005,9 @@ function startBenchmarkForCurrentMode(): void {
  */
 function toggleBenchmarkMode(): void {
   if (benchmarkSuite.isActive() || offscreenBenchmark.getIsRunning()) {
-    benchmarkSuite.stop();
-    offscreenBenchmark.stop();
-    btnBenchmark.textContent = 'Start Auto-Benchmark';
-    btnBenchmark.classList.remove('btn-secondary');
-    btnBenchmark.classList.add('btn-primary');
-    panelBenchStatus.classList.add('hidden');
-    valBenchState.textContent = 'Inactive';
-
-    metricsTrackers.forEach((t) => t.clear());
+    stopBenchmarkAndShowModal();
   } else {
+    closeBenchmarkResultsModal();
     startBenchmarkForCurrentMode();
   }
 }
@@ -866,6 +1017,10 @@ function toggleBenchmarkMode(): void {
 // ============================================================================
 function setupHotkeys() {
   window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeBenchmarkResultsModal();
+    }
+
     // Ignore hotkeys if the user is interacting with an input, select, or textarea element.
     // This prevents typing numbers (such as in seed or state.resolution) from accidentally triggering layout switches.
     const target = e.target as HTMLElement | null;
@@ -976,8 +1131,14 @@ function updateCardMetricPair(curEl: HTMLElement | null, avgEl: HTMLElement | nu
   const formatVal = (v: number | string) => typeof v === 'number'
     ? (v > 0 ? (decimals === 0 ? Math.round(v).toString() : v.toFixed(decimals)) : '--')
     : v;
-  if (curEl) curEl.textContent = formatVal(curVal);
-  if (avgEl) avgEl.textContent = formatVal(avgVal !== undefined ? avgVal : curVal);
+  if (curEl) {
+    const s = formatVal(curVal);
+    if (curEl.textContent !== s) curEl.textContent = s;
+  }
+  if (avgEl) {
+    const s = formatVal(avgVal !== undefined ? avgVal : curVal);
+    if (avgEl.textContent !== s) avgEl.textContent = s;
+  }
 }
 
 function animationLoop() {
@@ -1154,10 +1315,19 @@ function animationLoop() {
 
 
   // 2. Drive benchmark automated path
-  if (benchmarkSuite.isActive()) {
-    const cameras = renderers.map(r => r!.getCamera());
-    const controls = renderers.map(r => r!.getControls());
-    benchmarkSuite.update(dt, cameras, controls);
+  if (benchmarkSuite.isActive() || offscreenBenchmark.getIsRunning()) {
+    if (benchmarkSuite.isActive()) {
+      const cameras = renderers.map(r => r!.getCamera());
+      const controls = renderers.map(r => r!.getControls());
+      benchmarkSuite.update(dt, cameras, controls);
+    }
+    benchmarkElapsedTime += dt;
+    const targetBenchSec = state.benchmarkDuration || 10;
+    valBenchState.textContent = `Benchmarking... ${benchmarkElapsedTime.toFixed(1)}s / ${targetBenchSec.toFixed(1)}s`;
+
+    if (benchmarkElapsedTime >= targetBenchSec) {
+      stopBenchmarkAndShowModal();
+    }
   }
 
   // 3. Drive continuous wave motion when erosion is inactive AND there is no paused eroded state
@@ -1176,6 +1346,21 @@ function animationLoop() {
   // Uses base state.resolution directly since the tessellation multiplier is now fully integrated.
   const activeRes = state.resolution;
   if (state.isErosionActive) {
+    erosionElapsedTime += dt;
+    if (erosionStatusBadge) erosionStatusBadge.classList.remove('hidden');
+
+    if (state.erosionDuration === 'infinite') {
+      if (lblErosionProgress) lblErosionProgress.textContent = `Eroding... ${erosionElapsedTime.toFixed(1)}s (Infinite)`;
+    } else {
+      const targetSec = parseFloat(state.erosionDuration);
+      if (lblErosionProgress) lblErosionProgress.textContent = `Eroding... ${erosionElapsedTime.toFixed(1)}s / ${targetSec.toFixed(1)}s`;
+      if (erosionElapsedTime >= targetSec) {
+        state.isErosionActive = false;
+        syncErosionButtonUI();
+        if (lblErosionProgress) lblErosionProgress.textContent = `Paused at ${targetSec.toFixed(1)}s`;
+      }
+    }
+
     pipelines.forEach((p, i) => {
       if (!renderers[i]) return;
       if (!state.heightmapCache[i]) {
@@ -1259,7 +1444,23 @@ function animationLoop() {
     const avgTime = (totalBenchmarkTime / activeCount).toFixed(2);
     const avgMath = (totalBenchmarkMathTime / activeCount).toFixed(2);
 
-    if (!offscreenBenchmark.getIsRunning()) {
+    if (offscreenBenchmark.getIsRunning() && latestWorkerTelemetry) {
+      const t = latestWorkerTelemetry;
+      const fpsStr = `${t.fps} FPS`;
+      if (valBenchFps && valBenchFps.textContent !== fpsStr) valBenchFps.textContent = fpsStr;
+
+      const ftStr = `${(1000 / t.fps).toFixed(2)} ms`;
+      if (valBenchFrametime && valBenchFrametime.textContent !== ftStr) valBenchFrametime.textContent = ftStr;
+
+      const mathStr = `${t.avgMathTimeMs} ms (min: ${t.minMathTimeMs}ms, max: ${t.maxMathTimeMs}ms)`;
+      if (valBenchMathTime && valBenchMathTime.textContent !== mathStr) valBenchMathTime.textContent = mathStr;
+
+      const gpuStr = t.mode === 'headless' ? 'N/A (Headless Math)' : `${t.avgRenderTimeMs} ms (min: ${t.minRenderTimeMs}ms, max: ${t.maxRenderTimeMs}ms)`;
+      if (valBenchGpuTime && valBenchGpuTime.textContent !== gpuStr) valBenchGpuTime.textContent = gpuStr;
+
+      const framesStr = `${t.totalFrames.toLocaleString()} iterations`;
+      if (valBenchTotalFrames && valBenchTotalFrames.textContent !== framesStr) valBenchTotalFrames.textContent = framesStr;
+    } else if (!offscreenBenchmark.getIsRunning()) {
       if (valBenchFps) valBenchFps.textContent = `${avgFps} FPS`;
       if (valBenchFrametime) valBenchFrametime.textContent = `${avgFrametime} ms`;
       if (valBenchGpuTime) valBenchGpuTime.textContent = `${avgTime} ms`;

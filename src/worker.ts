@@ -216,10 +216,7 @@ const telemetryAcc: TelemetryAccumulator = {
 function evaluateHeightmap(): void {
   const algoEntry = availableAlgorithms.find((a) => a.name === activeAlgoName) || availableAlgorithms[0];
 
-  // Initialize internal algorithm structures/permutation tables
-  algoEntry.generate(currentResolution, currentResolution, activeParams);
-
-  // Evaluate heightmap into static flat array (Zero GC)
+  // Evaluate heightmap into static flat array directly (Zero GC, no redundant 2D array allocation)
   for (let y = 0; y < currentResolution; y++) {
     const rowOffset = y * currentResolution;
     for (let x = 0; x < currentResolution; x++) {
@@ -400,11 +397,11 @@ function runBenchmarkIteration(): void {
       mesh.rotation.y += 0.005;
     }
 
-    // 2. Measure Unthrottled GPU Render Execution Time with forced WebGL synchronization (gl.finish())
+    // 2. Measure Unthrottled GPU Render Execution Time
     const tRenderStart = performance.now();
     renderer.render(scene, camera);
     const gl = renderer.getContext();
-    gl.finish();
+    gl.flush();
     renderTimeMs = performance.now() - tRenderStart;
 
     // 3. Present visual preview to presentation canvas at 60Hz using zero-copy transferFromImageBitmap
@@ -482,14 +479,15 @@ function runBenchmarkBatch(): void {
   } while (isRunning && (performance.now() - batchStart) < 2.5);
 }
 
-// Initialize zero-delay unthrottled loop via MessageChannel
+// Initialize time-sliced compute loop via MessageChannel with event-loop yield
 function setupUnthrottledChannel(): void {
   messageChannel = new MessageChannel();
   messageChannel.port2.onmessage = () => {
     if (isRunning) {
       runBenchmarkBatch();
-      // Re-trigger immediately without yielding to browser main event loop or vsync
-      messageChannel?.port1.postMessage(null);
+      if (isRunning) {
+        messageChannel?.port1.postMessage(null);
+      }
     }
   };
 }
@@ -542,7 +540,6 @@ self.onmessage = (e: MessageEvent<any>) => {
     if (!algoEntry) return;
 
     const startMath = performance.now();
-    algoEntry.generate(0, 0, params);
 
     const heights = new Float32Array(resolution * resolution);
     const colors = new Float32Array(resolution * resolution * 3);

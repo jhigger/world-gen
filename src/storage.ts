@@ -11,6 +11,8 @@ export function saveConfig(cameraSnapshot?: { zoom: number; yaw: number; pitch: 
     persistence: state.params.persistence,
     palette: state.activePalette,
     isErosionActive: state.isErosionActive,
+    erosionDuration: state.erosionDuration,
+    benchmarkDuration: state.benchmarkDuration,
     showWireframe: state.showWireframe,
     showMetrics: state.showMetrics,
     viewMode: state.viewMode,
@@ -70,6 +72,8 @@ export function loadConfig() {
       if (typeof config.persistence === 'number') state.params.persistence = config.persistence;
       if (config.palette) state.activePalette = config.palette as ColorPalette;
       if (typeof config.isErosionActive === 'boolean') state.isErosionActive = config.isErosionActive;
+      if (typeof config.erosionDuration === 'string') state.erosionDuration = config.erosionDuration;
+      if (typeof config.benchmarkDuration === 'number') state.benchmarkDuration = config.benchmarkDuration;
       if (typeof config.showWireframe === 'boolean') state.showWireframe = config.showWireframe;
       if (typeof config.showMetrics === 'boolean') state.showMetrics = config.showMetrics;
       if (config.viewMode) state.viewMode = config.viewMode as 'grid' | 'single';
