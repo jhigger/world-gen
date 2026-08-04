@@ -1,5 +1,6 @@
 import { availableAlgorithms } from './algorithms';
-import { TerrainRenderer, ColorPalette } from './renderer';
+import { ColorPalette } from './renderer';
+import { ViewportManager } from './viewport-manager';
 import { PerformanceMetrics, BenchmarkSuite } from './benchmark';
 import { HydraulicErosion } from './physics';
 import { TerrainPipeline } from './pipeline';
@@ -152,8 +153,6 @@ function ensureOffscreenBenchmarkInitialized(): boolean {
 
 
 
-const renderers: (TerrainRenderer | null)[] = [null, null, null, null, null, null];
-
 const benchmarkSuite = new BenchmarkSuite();
 const offscreenBenchmark = new OffscreenBenchmarkManager();
 const metricsTrackers: PerformanceMetrics[] = [
@@ -162,6 +161,41 @@ const metricsTrackers: PerformanceMetrics[] = [
 ];
 const cachedMetricElements: Record<string, any> = {};
 const hydraulicErosion = new HydraulicErosion();
+
+export const viewportManager = new ViewportManager({
+  algorithms: availableAlgorithms,
+  onStatsUpdate: (index, stats) => {
+    metricsTrackers[index].addRenderTime(stats.renderTime);
+    metricsTrackers[index].addMathTime(stats.mathTime);
+    metricsTrackers[index].addRuggedness(stats.ruggedness);
+  },
+  onGridModeChange: (mode, index) => {
+    if (selectSingleAlgo) {
+      selectSingleAlgo.value = mode === 'single' ? index.toString() : '-1';
+    }
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+      if (mode === 'single') {
+        mainContent.classList.add('single-view-active');
+      } else {
+        mainContent.classList.remove('single-view-active');
+      }
+    }
+    const mobileAlgoTabs = document.querySelectorAll('.mobile-tab-btn');
+    mobileAlgoTabs.forEach((btn) => {
+      const idxAttr = btn.getAttribute('data-index');
+      if (idxAttr !== null) {
+        const i = parseInt(idxAttr, 10);
+        if (mode === 'single' && i === index) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      }
+    });
+  },
+  isSyncBlocked: () => benchmarkSuite.isActive(),
+});
 
 const pipelines: TerrainPipeline[] = availableAlgorithms.map(algo => {
   const p = new TerrainPipeline();
@@ -219,43 +253,8 @@ stateObservable.subscribe((path) => {
 
 
 async function initViewports() {
+  await viewportManager.init(gridContainer, availableAlgorithms);
   for (let index = 0; index < availableAlgorithms.length; index++) {
-    const algo = availableAlgorithms[index];
-    const canvas = document.getElementById(`canvas-${index}`) as HTMLCanvasElement;
-    if (!canvas) {
-      console.warn(`Canvas element 'canvas-${index}' not found, skipping viewport ${index}`);
-      return;
-    }
-    const renderer = new TerrainRenderer(canvas, algo);
-    await renderer.init();
-
-    const ctrl = renderer.getControls();
-    ctrl.addEventListener('change', () => {
-      if (state.isSyncing || benchmarkSuite.isActive()) return;
-      state.isSyncing = true;
-      try {
-        const sourceCam = renderer.getCamera();
-        const sourceTarget = ctrl.target;
-        renderers.forEach((r, idx) => {
-          if (idx === index || !r) return;
-          r.getCamera().position.copy(sourceCam.position);
-          r.getControls().target.copy(sourceTarget);
-          r.getControls().update();
-        });
-      } finally {
-        state.isSyncing = false;
-      }
-    });
-
-    renderer.onStatsUpdate = (stats) => {
-
-      metricsTrackers[index].addRenderTime(stats.renderTime);
-      metricsTrackers[index].addMathTime(stats.mathTime);
-      metricsTrackers[index].addRuggedness(stats.ruggedness);
-    };
-    
-    renderers[index] = renderer;
-
     cachedMetricElements[index] = {
       fps: document.getElementById(`fps-${index}`),
       frametime: document.getElementById(`frametime-${index}`),
@@ -313,65 +312,7 @@ function applyUiScale() {
 }
 
 function setViewMode(mode: 'grid' | 'single', index: number = 0) {
-  // State is now managed externally by ObservableState subscriptions
-  if (selectSingleAlgo) {
-    selectSingleAlgo.value = mode === 'single' ? index.toString() : '-1';
-  }
-  const mainContent = document.querySelector('.main-content');
-  if (mainContent) {
-    if (mode === 'single') {
-      mainContent.classList.add('single-view-active');
-    } else {
-      mainContent.classList.remove('single-view-active');
-    }
-  }
-  if (gridContainer) {
-    if (mode === 'single') {
-      gridContainer.classList.add('single-view');
-      renderers.forEach((_, i) => {
-        const c = document.getElementById(`card-${i}`);
-        if (c) {
-          if (i === index) {
-            c.classList.add('focused');
-          } else {
-            c.classList.remove('focused');
-          }
-        }
-      });
-    } else {
-      gridContainer.classList.remove('single-view');
-      renderers.forEach((_, i) => {
-        const c = document.getElementById(`card-${i}`);
-        if (c) {
-          c.classList.remove('focused');
-        }
-      });
-    }
-  }
-
-
-  // Synchronize Mobile Algo Tabs
-  const mobileAlgoTabs = document.querySelectorAll('.mobile-tab-btn');
-  mobileAlgoTabs.forEach((btn) => {
-    const idxAttr = btn.getAttribute('data-index');
-    if (idxAttr !== null) {
-      const i = parseInt(idxAttr, 10);
-      if (mode === 'single' && i === index) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    }
-  });
-
-  // Ensure renderers update camera aspect ratio and OrbitControls after DOM reflow
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      renderers.forEach((r) => {
-        if (r) r.resize();
-      });
-    });
-  });
+  viewportManager.setGridMode(mode, index);
 }
 
 
@@ -417,7 +358,7 @@ function resetToDefaults() {
  */
 function updateStorage() {
   let snap = undefined;
-  const activeRenderer = (state.viewMode === 'single' && renderers[state.focusedIndex]) ? renderers[state.focusedIndex] : (renderers[0] || renderers.find(r => r !== null));
+  const activeRenderer = viewportManager.getActiveRenderer();
   if (!benchmarkSuite.isActive() && activeRenderer) {
     const cam = activeRenderer.getCamera();
     const ctrl = activeRenderer.getControls();
@@ -506,26 +447,14 @@ function syncDOMToState(): void {
  * Applies saved spherical camera state onto Three.js Cartesian positions.
  */
 function applySavedCameraState(): void {
-  if (!renderers[0] || state.savedZoom === 0) return;
-
-  const distance = 500 / state.savedZoom;
-  const x = distance * Math.sin(state.savedPitch) * Math.sin(state.savedYaw);
-  const y = distance * Math.cos(state.savedPitch);
-  const z = distance * Math.sin(state.savedPitch) * Math.cos(state.savedYaw);
-
-  state.isSyncing = true;
-  try {
-    renderers.forEach((r) => {
-      if (!r) return;
-      const cam = r!.getCamera();
-      const ctrl = r!.getControls();
-      cam.position.set(x + state.cameraOffsetX, y + state.cameraOffsetY, z + state.cameraOffsetZ);
-      ctrl.target.set(state.cameraOffsetX, state.cameraOffsetY, state.cameraOffsetZ);
-      ctrl.update();
-    });
-  } finally {
-    state.isSyncing = false;
-  }
+  viewportManager.applySavedCameraState({
+    zoom: state.savedZoom,
+    pitch: state.savedPitch,
+    yaw: state.savedYaw,
+    offsetX: state.cameraOffsetX,
+    offsetY: state.cameraOffsetY,
+    offsetZ: state.cameraOffsetZ,
+  });
 }
 
 // ============================================================================
@@ -1177,25 +1106,11 @@ function animationLoop() {
     }
 
     const diffY = state.cameraOffsetY - oldOffsetY;
-    if (Math.abs(diffY) > 0.0001) {
-      state.isSyncing = true;
-      try {
-        renderers.forEach((r) => {
-          if (!r) return;
-          const cam = r!.getCamera();
-          const ctrl = r!.getControls();
-          cam.position.y += diffY;
-          ctrl.target.y = state.cameraOffsetY;
-          ctrl.update();
-        });
-      } finally {
-        state.isSyncing = false;
-      }
-    }
+    viewportManager.translateCameraHeight(diffY);
   }
 
   // Apply camera horizontal translation (travel) from held arrow keys
-  const activeRenderer = (state.viewMode === 'single' && renderers[state.focusedIndex]) ? renderers[state.focusedIndex] : (renderers[0] || renderers.find(r => r !== null));
+  const activeRenderer = viewportManager.getActiveRenderer();
   if ((state.keysPressed.arrowUp || state.keysPressed.arrowDown || state.keysPressed.arrowLeft || state.keysPressed.arrowRight) && !benchmarkSuite.isActive() && activeRenderer) {
     const cam = activeRenderer.getCamera();
     const ctrl = activeRenderer.getControls();
@@ -1250,75 +1165,22 @@ function animationLoop() {
         state.cameraOffsetX = newOffsetX;
         state.cameraOffsetZ = newOffsetZ;
 
-        state.isSyncing = true;
-        try {
-          renderers.forEach((r) => {
-            if (!r) return;
-            const otherCam = r.getCamera();
-            const otherCtrl = r.getControls();
-            otherCam.position.x += actualTransX;
-            otherCam.position.z += actualTransZ;
-            otherCtrl.target.x = state.cameraOffsetX;
-            otherCtrl.target.z = state.cameraOffsetZ;
-            otherCtrl.update();
-          });
-        } finally {
-          state.isSyncing = false;
-        }
+        viewportManager.panCamera(actualTransX, actualTransZ);
       }
     }
   }
 
   // 1. Apply camera orbit rotation
-  const activeIdx = (state.viewMode === 'single' && state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length)
-    ? state.focusedIndex
-    : 0;
-  const baseRenderer = renderers[activeIdx] || renderers.find(r => r !== null);
-
-  if (state.autoOrbit && !benchmarkSuite.isActive() && baseRenderer) {
-    const orbitAngle = dt * 0.12 * state.rotateSpeed; // Rotation speed scaled by user input
-    const cos = Math.cos(orbitAngle);
-    const sin = Math.sin(orbitAngle);
-
-    state.isSyncing = true;
-    const baseCam = baseRenderer.getCamera();
-    const baseCtrl = baseRenderer.getControls();
-    
-    // Rotate camera around target Y-axis
-    const dx = baseCam.position.x - baseCtrl.target.x;
-    const dz = baseCam.position.z - baseCtrl.target.z;
-
-    const newX = dx * cos - dz * sin + baseCtrl.target.x;
-    const newZ = dx * sin + dz * cos + baseCtrl.target.z;
-
-    baseCam.position.x = newX;
-    baseCam.position.z = newZ;
-    baseCam.lookAt(baseCtrl.target);
-    baseCtrl.update();
-
-    // Copy rotated coordinates to all other viewports
-    renderers.forEach((r, idx) => {
-      if (!r || idx === activeIdx) return;
-      r.getCamera().position.copy(baseCam.position);
-      r.getControls().target.copy(baseCtrl.target);
-      r.getControls().update();
-    });
-
-    // Update zoom slider readout
-    const distance = baseCam.position.distanceTo(baseCtrl.target);
-    const zoomVal = Math.round(500 / distance);
-    if (paramZoom) paramZoom.value = Math.max(50, Math.min(800, zoomVal)).toString();
-    if (valZoom) valZoom.value = Math.max(50, Math.min(800, zoomVal)).toString();
-
-    state.isSyncing = false;
+  if (state.autoOrbit && !benchmarkSuite.isActive()) {
+    viewportManager.autoRotate(dt, state.rotateSpeed);
   }
 
 
   // 2. Drive benchmark automated path
   if (benchmarkSuite.isActive() || offscreenBenchmark.getIsRunning()) {
     if (benchmarkSuite.isActive()) {
-      const cameras = renderers.map(r => r!.getCamera());
-      const controls = renderers.map(r => r!.getControls());
+      const cameras = viewportManager.getCameras();
+      const controls = viewportManager.getControls();
       benchmarkSuite.update(dt, cameras, controls);
     }
     benchmarkElapsedTime += dt;
@@ -1362,7 +1224,7 @@ function animationLoop() {
     }
 
     pipelines.forEach((p, i) => {
-      if (!renderers[i]) return;
+      if (!viewportManager.getRenderer(i)) return;
       if (!state.heightmapCache[i]) {
         state.heightmapCache[i] = p.generateBase(activeRes, activeRes, state.params);
       }
@@ -1378,15 +1240,16 @@ function animationLoop() {
   let totalBenchmarkMathTime = 0;
   let activeCount = 0;
 
+  const statsMap = viewportManager.update(state.params, activeRes, state.activePalette, state.showWireframe, state.heightmapCache, state.isErosionActive);
+
   for (let i = 0; i < availableAlgorithms.length; i++) {
-    if (!renderers[i] || !metricsTrackers[i]) continue;
+    const r = viewportManager.getRenderer(i);
+    if (!r || !metricsTrackers[i]) continue;
     const shouldRender = (state.viewMode === 'grid') || (state.viewMode === 'single' && i === state.focusedIndex);
 
     if (shouldRender) {
       metricsTrackers[i].tick();
-
-      const customMap = state.heightmapCache[i] || undefined;
-      const stats = renderers[i]!.render(state.params, activeRes, state.activePalette, state.showWireframe, customMap, state.isErosionActive);
+      const stats = statsMap[i] || undefined;
 
       if (stats) {
         metricsTrackers[i].addRenderTime(stats.renderTime);
@@ -1832,7 +1695,7 @@ function setupMathAnalysisToggle() {
 
 // Window resizing handler
 window.addEventListener('resize', () => {
-  renderers.forEach(r => r!.resize());
+  viewportManager.resize();
 });
 
 // ============================================================================
@@ -1849,7 +1712,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Initial layout sizing pass
   requestAnimationFrame(() => {
-    renderers.forEach(r => { if (r) r!.resize(); });
+    viewportManager.resize();
     
     // Start the animation loop
     requestAnimationFrame(animationLoop);
