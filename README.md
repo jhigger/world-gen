@@ -58,7 +58,7 @@ To unlock main-thread rendering throughput past your display's physical refresh 
 & "C:\Program Files\Google\Chrome\Application\chrome.exe" --disable-gpu-vsync --disable-frame-rate-limit --user-data-dir="$env:TEMP\chrome-bench"
 ```
 
-Then navigate to `http://localhost:5173`.
+Then navigate to `http://localhost:3000`.
 
 ---
 
