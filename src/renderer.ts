@@ -64,7 +64,7 @@ export class TerrainRenderer {
   private dirLight: THREE.DirectionalLight;
 
   // Render caching to prevent expensive buffer updates on static frames
-  private lastParams: any = null;
+  private lastParams: TerrainParams | null = null;
   private lastRenderCache = {
     resolution: -1,
     heightScale: -1,
@@ -318,7 +318,9 @@ export class TerrainRenderer {
       
       positionAttr.needsUpdate = true;
       colorAttr.needsUpdate = true;
-      this.geometry.computeVertexNormals();
+      const normalAttr = this.geometry.attributes.normal;
+      this.computeFastGridNormals(positions, normalAttr.array as Float32Array, resolution);
+      normalAttr.needsUpdate = true;
 
       this.lastRenderCache = {
         resolution,
@@ -356,6 +358,41 @@ export class TerrainRenderer {
       renderTime: totalTime,
       mathTime: totalTime // For sync, it's roughly the same
     };
+  }
+
+  /**
+   * Fast heightmap grid normal calculation.
+   * Directly calculates vertex normals from height gradients without expensive mesh face traversal.
+   */
+  private computeFastGridNormals(positions: Float32Array, normals: Float32Array, res: number): void {
+    const dxScale = res - 1;
+    for (let y = 0; y < res; y++) {
+      const yM1 = Math.max(0, y - 1) * res;
+      const yP1 = Math.min(res - 1, y + 1) * res;
+      const yCurr = y * res;
+      for (let x = 0; x < res; x++) {
+        const xM1 = Math.max(0, x - 1);
+        const xP1 = Math.min(res - 1, x + 1);
+
+        const hL = positions[(yCurr + xM1) * 3 + 2];
+        const hR = positions[(yCurr + xP1) * 3 + 2];
+        const hD = positions[(yM1 + x) * 3 + 2];
+        const hU = positions[(yP1 + x) * 3 + 2];
+
+        const dzdx = (hR - hL) * 0.5 * dxScale;
+        const dzdy = (hU - hD) * 0.5 * dxScale;
+
+        const nx = -dzdx;
+        const ny = -dzdy;
+        const nz = 1.0;
+        const invLen = 1.0 / Math.sqrt(nx * nx + ny * ny + 1.0);
+
+        const idx = (yCurr + x) * 3;
+        normals[idx] = nx * invLen;
+        normals[idx + 1] = ny * invLen;
+        normals[idx + 2] = nz * invLen;
+      }
+    }
   }
 
   /**

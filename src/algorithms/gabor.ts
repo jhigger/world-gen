@@ -44,7 +44,11 @@ export class GaborNoiseAlgorithm implements TerrainAlgorithm {
 
     const K = this.impulseDensity;
     const K2 = K * K;
+    const negPiK2 = -Math.PI * K2;
+    // Envelope threshold < 0.0001 corresponds to negPiK2 * distSq < -9.21034 => distSq > 9.21034 / (Math.PI * K2)
+    const maxDistSq = 9.21034 / (Math.PI * K2);
     const f0 = this.frequency;
+    const twoPiF0 = 2.0 * Math.PI * f0;
     const cosTheta = Math.cos(this.orientationAngle);
     const sinTheta = Math.sin(this.orientationAngle);
 
@@ -60,26 +64,29 @@ export class GaborNoiseAlgorithm implements TerrainAlgorithm {
         for (let i = 0; i < this.impulsesPerCell; i++) {
           const r1 = this.hash3D(cx, cy, seed + i * 4);
           const r2 = this.hash3D(cx, cy, seed + i * 4 + 1);
-          const r3 = this.hash3D(cx, cy, seed + i * 4 + 2);
-          const r4 = this.hash3D(cx, cy, seed + i * 4 + 3);
 
           const xi = cx + r1;
           const yi = cy + r2;
-          const ai = r3 * 2.0 - 1.0; // Random amplitude in [-1, 1]
-          const phi = r4 * 2.0 * Math.PI; // Random phase in [0, 2pi)
 
           const rx = x - xi;
           const ry = y - yi;
           const distSq = rx * rx + ry * ry;
 
-          // Gaussian envelope: exp(-pi * K^2 * (rx^2 + ry^2))
-          const envelope = Math.exp(-Math.PI * K2 * distSq);
+          // Early distance pruning BEFORE expensive exponential and hash calculations
+          if (distSq > maxDistSq) continue;
 
-          if (envelope < 0.0001) continue;
+          const r3 = this.hash3D(cx, cy, seed + i * 4 + 2);
+          const r4 = this.hash3D(cx, cy, seed + i * 4 + 3);
+
+          const ai = r3 * 2.0 - 1.0; // Random amplitude in [-1, 1]
+          const phi = r4 * 2.0 * Math.PI; // Random phase in [0, 2pi)
+
+          // Gaussian envelope: exp(-pi * K^2 * (rx^2 + ry^2))
+          const envelope = Math.exp(negPiK2 * distSq);
 
           // Sinusoidal wave: cos(2*pi * f_0 * (rx*cos(theta) + ry*sin(theta)) + phi)
           const proj = rx * cosTheta + ry * sinTheta;
-          const harmonic = Math.cos(2.0 * Math.PI * f0 * proj + phi);
+          const harmonic = Math.cos(twoPiF0 * proj + phi);
 
           sum += ai * envelope * harmonic;
         }
