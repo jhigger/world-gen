@@ -1,4 +1,4 @@
-# Comparison of Common Terrain Generation Algorithms to Support Informed Decisions in Game Development
+# Comparison of common random terrain generation and noise algorithms to support informed decisions in game world generation
 
 > **Research & Interactive Benchmark Suite**  
 > An empirical evaluation and real-time comparison framework designed to support game developers, technical directors, and graphics engineers in making informed algorithmic choices for procedural world generation.
