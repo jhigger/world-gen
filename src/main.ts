@@ -125,7 +125,9 @@ function ensureOffscreenBenchmarkInitialized(): boolean {
   offscreenCanvasEl.style.marginTop = '8px';
   panelBenchStatus.appendChild(offscreenCanvasEl);
 
-  const activeIdx = state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0;
+  const activeIdx = isSequentialBenchmarkRunning 
+    ? currentBenchmarkAlgoIndex 
+    : (state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0);
   const algoName = availableAlgorithms[activeIdx].name;
   const selectedMode = (selectBenchmarkMode?.value as BenchmarkMode) || 'offscreen';
 
@@ -137,6 +139,9 @@ function ensureOffscreenBenchmarkInitialized(): boolean {
     state.resolution,
     (telemetry) => {
       latestWorkerTelemetry = telemetry;
+      if (isSequentialBenchmarkRunning) {
+        workerAccumulator.recordSample(telemetry.fps, telemetry.maxMathTimeMs, telemetry.maxRenderTimeMs);
+      }
     },
     selectedMode
   );
@@ -223,8 +228,10 @@ stateObservable.subscribe((path) => {
     path === 'isErosionActive' ||
     path === 'activePalette'
   ) {
-    metricsTrackers.forEach((m) => m.reset());
-    latestWorkerTelemetry = null;
+    if (!isSequentialBenchmarkRunning) {
+      metricsTrackers.forEach((m) => m.reset());
+      latestWorkerTelemetry = null;
+    }
   }
 
   if (path.startsWith('params.') || path === 'resolution') {
@@ -232,7 +239,9 @@ stateObservable.subscribe((path) => {
   }
 
   if (offscreenBenchmark.getIsRunning() && (path.startsWith('params') || path === 'resolution' || path === 'focusedIndex')) {
-    const activeIdx = state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0;
+    const activeIdx = isSequentialBenchmarkRunning 
+      ? currentBenchmarkAlgoIndex 
+      : (state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0);
     const algoName = availableAlgorithms[activeIdx].name;
     offscreenBenchmark.updateParams(algoName, state.resolution, state.params);
   }
@@ -797,6 +806,97 @@ function syncErosionButtonUI(): void {
   }
 }
 
+interface CompiledAlgoResult {
+  avgFps: number;
+  lowFps: number;
+  avgFrameMs: number;
+  lowFrameMs: number;
+}
+
+class WorkerBenchmarkAccumulator {
+  private fpsBuffer = new Float32Array(500);
+  private frameMsBuffer = new Float32Array(500);
+  private scratchBuffer = new Float32Array(500);
+  private sampleCount = 0;
+
+  reset(): void {
+    this.sampleCount = 0;
+  }
+
+  recordSample(fps: number, maxMathTimeMs: number, maxRenderTimeMs: number): void {
+    if (fps <= 0) return;
+    const totalFrameMs = maxMathTimeMs + maxRenderTimeMs > 0 
+      ? maxMathTimeMs + maxRenderTimeMs 
+      : 1000 / fps;
+      
+    const idx = this.sampleCount % this.fpsBuffer.length;
+    this.fpsBuffer[idx] = fps;
+    this.frameMsBuffer[idx] = totalFrameMs;
+    if (this.sampleCount < 50000) {
+      this.sampleCount++;
+    }
+  }
+
+  getCompiledResult(): CompiledAlgoResult {
+    if (this.sampleCount === 0) {
+      return { avgFps: 0, lowFps: 0, avgFrameMs: 0, lowFrameMs: 0 };
+    }
+
+    const n = Math.min(this.sampleCount, this.fpsBuffer.length);
+    let fpsSum = 0;
+    for (let i = 0; i < n; i++) {
+      fpsSum += this.fpsBuffer[i];
+      this.scratchBuffer[i] = this.frameMsBuffer[i];
+    }
+    const avgFps = Math.round(fpsSum / n);
+    const avgFrameMs = avgFps > 0 ? parseFloat((1000 / avgFps).toFixed(2)) : 0;
+
+    // Zero-GC in-place typed array sort
+    const validSamples = this.scratchBuffer.subarray(0, n);
+    validSamples.sort();
+
+    const p99Index = Math.max(0, Math.min(Math.ceil(n * 0.99) - 1, n - 1));
+    const p99FrameMs = validSamples[p99Index] || (avgFps > 0 ? 1000 / avgFps : 0);
+
+    const lowFps = p99FrameMs > 0 ? Math.round(1000 / p99FrameMs) : avgFps;
+    const lowFrameMs = parseFloat(p99FrameMs.toFixed(2));
+
+    return { avgFps, lowFps, avgFrameMs, lowFrameMs };
+  }
+}
+
+const workerAccumulator = new WorkerBenchmarkAccumulator();
+let compiledAlgoResults: (CompiledAlgoResult | null)[] = [];
+let currentBenchmarkAlgoIndex = 0;
+let isSequentialBenchmarkRunning = false;
+let savedViewMode: 'grid' | 'single' = 'grid';
+let savedFocusedIndex = 0;
+
+function extractAlgorithmMetrics(i: number): CompiledAlgoResult {
+  const compiled = compiledAlgoResults[i];
+  if (compiled && compiled.avgFps > 0) {
+    return compiled;
+  }
+
+  const tracker = metricsTrackers[i];
+  let avgFps = tracker ? (tracker.getGlobalAverageFPS() || tracker.getFPS()) : 0;
+  let lowFps = tracker ? (tracker.getGlobalOnePercentLowFPS() || avgFps) : 0;
+  let avgFrameMs = tracker ? (tracker.getGlobalAverageFrameTime() || tracker.getAverageFrameTime()) : 0;
+  let lowFrameMs = tracker ? (tracker.getGlobalOnePercentLowFrameTime() || avgFrameMs) : 0;
+
+  const activeFocusedIdx = isSequentialBenchmarkRunning ? currentBenchmarkAlgoIndex : state.focusedIndex;
+  if (avgFps === 0 && latestWorkerTelemetry && i === activeFocusedIdx) {
+    const t = latestWorkerTelemetry;
+    avgFps = Math.round(t.fps);
+    const maxFrameMs = t.maxMathTimeMs + t.maxRenderTimeMs;
+    lowFps = maxFrameMs > 0 ? Math.round(1000 / maxFrameMs) : avgFps;
+    avgFrameMs = avgFps > 0 ? parseFloat((1000 / avgFps).toFixed(2)) : 0;
+    lowFrameMs = maxFrameMs > 0 ? parseFloat(maxFrameMs.toFixed(2)) : avgFrameMs;
+  }
+
+  return { avgFps, lowFps, avgFrameMs, lowFrameMs };
+}
+
 function openBenchmarkResultsModal(): void {
   if (!benchmarkChartContainer || !benchmarkResultsModal) return;
 
@@ -804,60 +904,42 @@ function openBenchmarkResultsModal(): void {
 
   let maxFps = 60;
   const metricsData = availableAlgorithms.map((algo, i) => {
-    const tracker = metricsTrackers[i];
-    let avgFps = tracker ? tracker.getGlobalAverageFPS() : 0;
-    let lowFps = tracker ? tracker.getGlobalOnePercentLowFPS() : 0;
-    let avgFrameMs = tracker ? tracker.getGlobalAverageFrameTime() : 0;
-    let lowFrameMs = tracker ? tracker.getGlobalOnePercentLowFrameTime() : 0;
+    const m = extractAlgorithmMetrics(i);
 
-    // Fallback if offscreen telemetry was active on focused algorithm
-    if (avgFps === 0 && latestWorkerTelemetry && i === state.focusedIndex) {
-      const t = latestWorkerTelemetry;
-      avgFps = Math.round(t.fps);
-      const maxFrameMs = t.maxMathTimeMs + t.maxRenderTimeMs;
-      lowFps = maxFrameMs > 0 ? Math.round(1000 / maxFrameMs) : avgFps;
-      avgFrameMs = avgFps > 0 ? parseFloat((1000 / avgFps).toFixed(2)) : 0;
-      lowFrameMs = maxFrameMs > 0 ? parseFloat(maxFrameMs.toFixed(2)) : avgFrameMs;
-    }
-
-    if (avgFps > maxFps) maxFps = avgFps;
-    if (lowFps > maxFps) maxFps = lowFps;
+    if (m.avgFps > maxFps) maxFps = m.avgFps;
+    if (m.lowFps > maxFps) maxFps = m.lowFps;
 
     return {
       name: algo.name,
       badge: algoCategories[i % algoCategories.length] || 'Noise',
-      avgFps,
-      lowFps,
-      avgFrameMs,
-      lowFrameMs,
+      avgFps: m.avgFps,
+      lowFps: m.lowFps,
+      avgFrameMs: m.avgFrameMs,
+      lowFrameMs: m.lowFrameMs,
     };
   });
 
-  const chartRowsHtml = metricsData.map((d) => {
-    const avgPct = Math.max(6, Math.min(100, (d.avgFps / maxFps) * 100));
-    const lowPct = Math.max(6, Math.min(100, (d.lowFps / maxFps) * 100));
+  const chartRowsHtml = metricsData.map((metricItem) => {
+    const avgPct = Math.max(2, Math.min(100, (metricItem.avgFps / maxFps) * 100));
+    const lowPct = Math.max(2, Math.min(100, (metricItem.lowFps / maxFps) * 100));
 
     return `
       <div class="chart-row">
         <div class="chart-algo-header">
-          <span class="chart-algo-name">${d.name}</span>
-          <span class="chart-algo-badge">${d.badge}</span>
+          <span class="chart-algo-name">${metricItem.name}</span>
+          <span class="chart-algo-badge">${metricItem.badge}</span>
         </div>
         <div class="bar-pair">
           <div class="bar-wrapper">
-            <span class="bar-label">Average</span>
+            <span class="bar-value-label">${metricItem.avgFps} FPS (${metricItem.avgFrameMs}ms)</span>
             <div class="bar-track">
-              <div class="bar bar-avg" style="width: ${avgPct}%;">
-                <span class="bar-value">${d.avgFps} FPS (${d.avgFrameMs}ms)</span>
-              </div>
+              <div class="bar bar-avg" style="width: ${avgPct}%;"></div>
             </div>
           </div>
           <div class="bar-wrapper">
-            <span class="bar-label">1% Low</span>
+            <span class="bar-value-label">${metricItem.lowFps} FPS (${metricItem.lowFrameMs}ms)</span>
             <div class="bar-track">
-              <div class="bar bar-low" style="width: ${lowPct}%;">
-                <span class="bar-value">${d.lowFps} FPS (${d.lowFrameMs}ms)</span>
-              </div>
+              <div class="bar bar-low" style="width: ${lowPct}%;"></div>
             </div>
           </div>
         </div>
@@ -875,35 +957,38 @@ function closeBenchmarkResultsModal(): void {
   }
 }
 
-function stopBenchmarkAndShowModal(): void {
-  benchmarkSuite.stop();
-  offscreenBenchmark.stop();
-  btnBenchmark.textContent = 'Start Auto-Benchmark';
-  btnBenchmark.classList.remove('btn-secondary');
-  btnBenchmark.classList.add('btn-primary');
-  panelBenchStatus.classList.add('hidden');
-  valBenchState.textContent = 'Inactive';
-
-  openBenchmarkResultsModal();
+function recordResultsForAlgo(idx: number): void {
+  const selectedMode = (selectBenchmarkMode?.value as BenchmarkMode) || 'offscreen';
+  if (selectedMode === 'vsync') {
+    compiledAlgoResults[idx] = extractAlgorithmMetrics(idx);
+  } else {
+    const compiled = workerAccumulator.getCompiledResult();
+    if (compiled.avgFps > 0) {
+      compiledAlgoResults[idx] = compiled;
+    } else {
+      compiledAlgoResults[idx] = extractAlgorithmMetrics(idx);
+    }
+  }
 }
 
-function startBenchmarkForCurrentMode(): void {
-  const selectedMode = (selectBenchmarkMode?.value as BenchmarkMode) || 'offscreen';
+function startBenchmarkForAlgo(idx: number): void {
   benchmarkElapsedTime = 0;
-  benchmarkSuite.start();
-  metricsTrackers.forEach((t) => t.clear());
+  latestWorkerTelemetry = null;
+  workerAccumulator.reset();
+  metricsTrackers[idx].clear();
+  const selectedMode = (selectBenchmarkMode?.value as BenchmarkMode) || 'offscreen';
 
   if (selectedMode === 'vsync') {
+    setViewMode('single', idx);
     offscreenBenchmark.stop();
     if (offscreenCanvasEl) {
       offscreenCanvasEl.style.display = 'none';
     }
-    valBenchState.textContent = 'Running (VSync rAF Main Thread)';
   } else {
+    setViewMode('single', idx);
     const initialized = ensureOffscreenBenchmarkInitialized();
     if (initialized) {
-      const activeIdx = state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0;
-      const algoName = availableAlgorithms[activeIdx].name;
+      const algoName = availableAlgorithms[idx].name;
       offscreenBenchmark.updateParams(algoName, state.resolution, state.params, selectedMode);
       offscreenBenchmark.setMode(selectedMode);
       offscreenBenchmark.start();
@@ -911,17 +996,10 @@ function startBenchmarkForCurrentMode(): void {
       if (offscreenCanvasEl) {
         offscreenCanvasEl.style.display = selectedMode === 'offscreen' ? 'block' : 'none';
       }
-
-      valBenchState.textContent = selectedMode === 'offscreen'
-        ? 'Running (Offscreen WebGL Engine)'
-        : 'Running (Headless Math Engine)';
-    } else {
-      if (offscreenCanvasEl) {
-        offscreenCanvasEl.style.display = 'none';
-      }
-      valBenchState.textContent = 'Running (rAF Fallback)';
     }
   }
+
+  benchmarkSuite.start();
 
   btnBenchmark.textContent = 'Stop Benchmark';
   btnBenchmark.classList.remove('btn-primary');
@@ -929,11 +1007,46 @@ function startBenchmarkForCurrentMode(): void {
   panelBenchStatus.classList.remove('hidden');
 }
 
+function stopBenchmarkAndShowModal(): void {
+  if (isSequentialBenchmarkRunning && currentBenchmarkAlgoIndex < availableAlgorithms.length) {
+    recordResultsForAlgo(currentBenchmarkAlgoIndex);
+  }
+  isSequentialBenchmarkRunning = false;
+  benchmarkSuite.stop();
+  offscreenBenchmark.stop();
+  if (offscreenCanvasEl) {
+    offscreenCanvasEl.style.display = 'none';
+  }
+  btnBenchmark.textContent = 'Start Auto-Benchmark';
+  btnBenchmark.classList.remove('btn-secondary');
+  btnBenchmark.classList.add('btn-primary');
+  panelBenchStatus.classList.add('hidden');
+  valBenchState.textContent = 'Inactive';
+
+  state.viewMode = savedViewMode;
+  state.focusedIndex = savedFocusedIndex;
+  setViewMode(savedViewMode, savedFocusedIndex);
+  openBenchmarkResultsModal();
+}
+
+function startBenchmarkForCurrentMode(): void {
+  if (isSequentialBenchmarkRunning) {
+    stopBenchmarkAndShowModal();
+    return;
+  }
+  savedViewMode = state.viewMode;
+  savedFocusedIndex = state.focusedIndex;
+  compiledAlgoResults = new Array(availableAlgorithms.length).fill(null);
+  currentBenchmarkAlgoIndex = 0;
+  isSequentialBenchmarkRunning = true;
+  startBenchmarkForAlgo(0);
+}
+
 /**
  * Initiates or aborts the automated camera benchmark sequence.
  */
 function toggleBenchmarkMode(): void {
-  if (benchmarkSuite.isActive() || offscreenBenchmark.getIsRunning()) {
+  if (isSequentialBenchmarkRunning || benchmarkSuite.isActive() || offscreenBenchmark.getIsRunning()) {
     stopBenchmarkAndShowModal();
   } else {
     closeBenchmarkResultsModal();
@@ -1177,7 +1290,7 @@ function animationLoop() {
 
 
   // 2. Drive benchmark automated path
-  if (benchmarkSuite.isActive() || offscreenBenchmark.getIsRunning()) {
+  if (isSequentialBenchmarkRunning || benchmarkSuite.isActive() || offscreenBenchmark.getIsRunning()) {
     if (benchmarkSuite.isActive()) {
       const cameras = viewportManager.getCameras();
       const controls = viewportManager.getControls();
@@ -1185,10 +1298,17 @@ function animationLoop() {
     }
     benchmarkElapsedTime += dt;
     const targetBenchSec = state.benchmarkDuration || 10;
-    valBenchState.textContent = `Benchmarking... ${benchmarkElapsedTime.toFixed(1)}s / ${targetBenchSec.toFixed(1)}s`;
+    const currentAlgoName = availableAlgorithms[currentBenchmarkAlgoIndex]?.name || 'Algorithm';
+    valBenchState.textContent = `Benchmarking (${currentBenchmarkAlgoIndex + 1}/${availableAlgorithms.length}): ${currentAlgoName}... ${benchmarkElapsedTime.toFixed(1)}s / ${targetBenchSec.toFixed(1)}s`;
 
     if (benchmarkElapsedTime >= targetBenchSec) {
-      stopBenchmarkAndShowModal();
+      recordResultsForAlgo(currentBenchmarkAlgoIndex);
+      currentBenchmarkAlgoIndex++;
+      if (currentBenchmarkAlgoIndex < availableAlgorithms.length) {
+        startBenchmarkForAlgo(currentBenchmarkAlgoIndex);
+      } else {
+        stopBenchmarkAndShowModal();
+      }
     }
   }
 
@@ -1245,7 +1365,8 @@ function animationLoop() {
   for (let i = 0; i < availableAlgorithms.length; i++) {
     const r = viewportManager.getRenderer(i);
     if (!r || !metricsTrackers[i]) continue;
-    const shouldRender = (state.viewMode === 'grid') || (state.viewMode === 'single' && i === state.focusedIndex);
+    const activeFocusedIdx = isSequentialBenchmarkRunning ? currentBenchmarkAlgoIndex : state.focusedIndex;
+    const shouldRender = (state.viewMode === 'grid') || (state.viewMode === 'single' && i === activeFocusedIdx);
 
     if (shouldRender) {
       metricsTrackers[i].tick();
@@ -1272,7 +1393,7 @@ function animationLoop() {
       const avgRuggedness = metricsTrackers[i].getGlobalAverageRuggedness();
 
       if (els) {
-        const focusedIdx = state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0;
+        const focusedIdx = activeFocusedIdx >= 0 && activeFocusedIdx < availableAlgorithms.length ? activeFocusedIdx : 0;
         if (offscreenBenchmark.getIsRunning() && i === focusedIdx && latestWorkerTelemetry) {
           const t = latestWorkerTelemetry;
           const frameMs = t.fps > 0 ? 1000 / t.fps : 0;
@@ -1301,18 +1422,13 @@ function animationLoop() {
   }
 
   // 6. Display aggregated benchmark summaries
-  if (benchmarkSuite.isActive() && activeCount > 0) {
-    const avgFps = Math.round(totalBenchmarkFps / activeCount);
-    const avgFrametime = (totalBenchmarkFrametime / activeCount).toFixed(2);
-    const avgTime = (totalBenchmarkTime / activeCount).toFixed(2);
-    const avgMath = (totalBenchmarkMathTime / activeCount).toFixed(2);
-
+  if (benchmarkSuite.isActive() || isSequentialBenchmarkRunning) {
     if (offscreenBenchmark.getIsRunning() && latestWorkerTelemetry) {
       const t = latestWorkerTelemetry;
       const fpsStr = `${t.fps} FPS`;
       if (valBenchFps && valBenchFps.textContent !== fpsStr) valBenchFps.textContent = fpsStr;
 
-      const ftStr = `${(1000 / t.fps).toFixed(2)} ms`;
+      const ftStr = `${t.fps > 0 ? (1000 / t.fps).toFixed(2) : '0.00'} ms`;
       if (valBenchFrametime && valBenchFrametime.textContent !== ftStr) valBenchFrametime.textContent = ftStr;
 
       const mathStr = `${t.avgMathTimeMs} ms (min: ${t.minMathTimeMs}ms, max: ${t.maxMathTimeMs}ms)`;
@@ -1323,7 +1439,12 @@ function animationLoop() {
 
       const framesStr = `${t.totalFrames.toLocaleString()} iterations`;
       if (valBenchTotalFrames && valBenchTotalFrames.textContent !== framesStr) valBenchTotalFrames.textContent = framesStr;
-    } else if (!offscreenBenchmark.getIsRunning()) {
+    } else if (activeCount > 0) {
+      const avgFps = Math.round(totalBenchmarkFps / activeCount);
+      const avgFrametime = (totalBenchmarkFrametime / activeCount).toFixed(2);
+      const avgTime = (totalBenchmarkTime / activeCount).toFixed(2);
+      const avgMath = (totalBenchmarkMathTime / activeCount).toFixed(2);
+
       if (valBenchFps) valBenchFps.textContent = `${avgFps} FPS`;
       if (valBenchFrametime) valBenchFrametime.textContent = `${avgFrametime} ms`;
       if (valBenchGpuTime) valBenchGpuTime.textContent = `${avgTime} ms`;
