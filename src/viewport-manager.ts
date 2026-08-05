@@ -13,6 +13,11 @@ export interface CameraState {
   offsetZ: number;
 }
 
+function clampAndRound(val: number, min: number, max: number, dec: number): number {
+  const mult = dec < 1 && dec > 0 ? 1 / dec : Math.pow(10, dec);
+  return Math.round(Math.max(min, Math.min(max, val)) * mult) / mult;
+}
+
 export interface ViewportManagerOptions {
   algorithms?: TerrainAlgorithm[];
   pipelines?: TerrainPipeline[];
@@ -36,11 +41,6 @@ export class ViewportManager {
   private viewMode: 'grid' | 'single' = 'grid';
   private focusedIndex: number = 0;
   private isSyncing: boolean = false;
-
-  private animFrameId: number | null = null;
-  private isLoopRunning: boolean = false;
-  private lastTime: number = performance.now();
-
   private resizeObserver?: ResizeObserver;
 
   // Encapsulated camera spatial state
@@ -229,6 +229,92 @@ export class ViewportManager {
   }
 
   /**
+   * Navigates camera horizontally (X/Z plane) based on directional keys relative to camera orientation.
+   */
+  public navigateCamera(
+    keys: { arrowUp?: boolean; arrowDown?: boolean; arrowLeft?: boolean; arrowRight?: boolean },
+    dt: number
+  ): void {
+    const activeRenderer = this.getActiveRenderer();
+    if (!activeRenderer) return;
+
+    const cam = activeRenderer.getCamera();
+    const ctrl = activeRenderer.getControls();
+
+    const dx = ctrl.target.x - cam.position.x;
+    const dz = ctrl.target.z - cam.position.z;
+    const len = Math.sqrt(dx * dx + dz * dz);
+
+    let forwardX = 0;
+    let forwardZ = -1;
+    if (len > 0.0001) {
+      forwardX = dx / len;
+      forwardZ = dz / len;
+    }
+    const rightX = -forwardZ;
+    const rightZ = forwardX;
+
+    let moveX = 0;
+    let moveZ = 0;
+
+    if (keys.arrowUp) {
+      moveX += forwardX;
+      moveZ += forwardZ;
+    }
+    if (keys.arrowDown) {
+      moveX -= forwardX;
+      moveZ -= forwardZ;
+    }
+    if (keys.arrowLeft) {
+      moveX -= rightX;
+      moveZ -= rightZ;
+    }
+    if (keys.arrowRight) {
+      moveX += rightX;
+      moveZ += rightZ;
+    }
+
+    const moveLen = Math.sqrt(moveX * moveX + moveZ * moveZ);
+    if (moveLen > 0) {
+      const step = 1.5 * dt;
+      const transX = (moveX / moveLen) * step;
+      const transZ = (moveZ / moveLen) * step;
+
+      const newOffsetX = clampAndRound(this.cameraState.offsetX + transX, -5.0, 5.0, 2);
+      const newOffsetZ = clampAndRound(this.cameraState.offsetZ + transZ, -5.0, 5.0, 2);
+
+      const actualTransX = newOffsetX - this.cameraState.offsetX;
+      const actualTransZ = newOffsetZ - this.cameraState.offsetZ;
+
+      if (Math.abs(actualTransX) > 0.0001 || Math.abs(actualTransZ) > 0.0001) {
+        this.panCamera(actualTransX, actualTransZ);
+      }
+    }
+  }
+
+  /**
+   * Navigates camera vertically (Y axis) based on space/shift keys.
+   */
+  public navigateVerticalCamera(
+    keys: { space?: boolean; shift?: boolean },
+    dt: number
+  ): void {
+    if (!keys.space && !keys.shift) return;
+    const shiftStep = 1.5 * dt;
+    let diffY = 0;
+    if (keys.space) {
+      diffY = shiftStep;
+    } else if (keys.shift) {
+      diffY = -shiftStep;
+    }
+    const newOffsetY = clampAndRound(this.cameraState.offsetY + diffY, -5.0, 5.0, 2);
+    const actualDiffY = newOffsetY - this.cameraState.offsetY;
+    if (Math.abs(actualDiffY) > 0.0001) {
+      this.translateCameraHeight(actualDiffY);
+    }
+  }
+
+  /**
    * Applies auto-rotation around target Y axis for synchronized viewports.
    */
   public autoRotate(dt: number, rotateSpeed: number): void {
@@ -409,6 +495,29 @@ export class ViewportManager {
     return this.renderers[0] || this.renderers.find((r) => r !== null) || null;
   }
 
+  /**
+   * Computes current active camera spherical coordinates snapshot for persistence.
+   */
+  public getSphericalCameraSnapshot(): { zoom: number; pitch: number; yaw: number; offsetX: number; offsetY: number; offsetZ: number } | undefined {
+    const activeRenderer = this.getActiveRenderer();
+    if (!activeRenderer || (this.options.isSyncBlocked && this.options.isSyncBlocked())) return undefined;
+    const cam = activeRenderer.getCamera();
+    const ctrl = activeRenderer.getControls();
+
+    const dx = cam.position.x - ctrl.target.x;
+    const dy = cam.position.y - ctrl.target.y;
+    const dz = cam.position.z - ctrl.target.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    return {
+      zoom: Math.round(500 / distance),
+      pitch: Math.acos(Math.max(-1, Math.min(1, dy / distance))),
+      yaw: Math.atan2(dx, dz) >= 0 ? Math.atan2(dx, dz) : Math.atan2(dx, dz) + 2 * Math.PI,
+      offsetX: ctrl.target.x,
+      offsetY: ctrl.target.y,
+      offsetZ: ctrl.target.z
+    };
+  }
+
   public getViewMode(): 'grid' | 'single' {
     return this.viewMode;
   }
@@ -426,10 +535,9 @@ export class ViewportManager {
   }
 
   /**
-   * Disposes of all viewports, observers, and render loops.
+   * Disposes of all viewports and observers.
    */
   public dispose(): void {
-    this.stopRenderLoop();
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
@@ -437,48 +545,5 @@ export class ViewportManager {
       if (r) r.dispose();
     });
     this.renderers = [];
-  }
-
-  /**
-   * Starts the animation render loop ticker.
-   */
-  public startRenderLoop(onTick?: (dt: number) => void): void {
-    if (this.isLoopRunning) return;
-    this.isLoopRunning = true;
-    this.lastTime = performance.now();
-
-    const loop = () => {
-      if (!this.isLoopRunning) return;
-      const now = performance.now();
-
-      let dt = (now - this.lastTime) / 1000;
-      this.lastTime = now;
-      if (dt > 0.1) dt = 0.1;
-
-      if (onTick) {
-        onTick(dt);
-      } else if (this.options.onFrameTick) {
-        this.options.onFrameTick(dt);
-      }
-
-      if (typeof requestAnimationFrame !== 'undefined') {
-        this.animFrameId = requestAnimationFrame(loop);
-      }
-    };
-
-    if (typeof requestAnimationFrame !== 'undefined') {
-      this.animFrameId = requestAnimationFrame(loop);
-    }
-  }
-
-  /**
-   * Stops the animation render loop ticker.
-   */
-  public stopRenderLoop(): void {
-    this.isLoopRunning = false;
-    if (this.animFrameId !== null && typeof cancelAnimationFrame !== 'undefined') {
-      cancelAnimationFrame(this.animFrameId);
-      this.animFrameId = null;
-    }
   }
 }

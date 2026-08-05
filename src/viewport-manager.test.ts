@@ -76,11 +76,11 @@ describe('ViewportManager', () => {
     expect(viewportManager.cameraState.offsetZ).toBe(-0.5);
   });
 
-  it('handles start and stop render loop cleanly', () => {
-    const tickSpy = vi.fn();
-    viewportManager.startRenderLoop(tickSpy);
-    viewportManager.stopRenderLoop();
-    expect(viewportManager['isLoopRunning']).toBe(false);
+  it('handles spatial camera navigation methods cleanly', () => {
+    expect(() => viewportManager.navigateVerticalCamera({ space: true }, 0.1)).not.toThrow();
+    expect(viewportManager.cameraState.offsetY).toBeGreaterThan(0);
+
+    expect(() => viewportManager.navigateCamera({ arrowUp: true }, 0.1)).not.toThrow();
   });
 
   it('disposes cleanly without throwing errors', () => {
