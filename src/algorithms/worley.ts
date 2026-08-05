@@ -13,6 +13,7 @@ export class WorleyNoise implements TerrainAlgorithm {
   name = 'Worley Noise (Cellular) (1996)';
   badge = 'Voronoi';
   description = 'Calculates distances to nearest seed points. Produces cellular geometric patterns suited for stone, scales, or dry valley structures.';
+  complexity = 'O(9 × octaves)';
 
   /**
    * Deterministic 32-bit unsigned cell seed.

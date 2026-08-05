@@ -2,8 +2,26 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   WorkerBenchmarkAccumulator,
   BenchmarkOrchestrator,
+  enrichAlgoMetrics,
 } from './benchmark-orchestrator';
 import { resetStateToDefaults } from './state';
+
+// ---------------------------------------------------------------------------
+// enrichAlgoMetrics
+// ---------------------------------------------------------------------------
+describe('enrichAlgoMetrics', () => {
+  it('calculates unrounded microsecond precision and memory footprint', () => {
+    const raw = { avgFps: 120, lowFps: 100, avgFrameMs: 8.33, lowFrameMs: 10.0 };
+    const enriched = enrichAlgoMetrics(raw, 0, 120);
+
+    // 120 FPS -> exact 8.333333ms. totalSamples = 14400.
+    // 8.333333ms * 1000 / 14400 = 0.578703... -> 0.579 us
+    expect(enriched.perSampleUs).toBe(0.579);
+    // 14400 * 4 / 1024 = 56.25 -> 56.3 KB
+    expect(enriched.memoryKB).toBe(56.3);
+    expect(enriched.complexity).toBe('O(octaves)');
+  });
+});
 
 // ---------------------------------------------------------------------------
 // WorkerBenchmarkAccumulator

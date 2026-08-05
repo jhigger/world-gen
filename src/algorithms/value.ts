@@ -12,6 +12,7 @@ export class ValueNoise implements TerrainAlgorithm {
   name = 'Value Noise (c. 1980)';
   badge = 'Lattice';
   description = 'Assigns random values to grid intersections and interpolates between them. Produces blockier, more angular grid-aligned shapes.';
+  complexity = 'O(octaves)';
 
   private p: number[] = new Array(512);
   private currentSeed: number = -1;

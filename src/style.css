@@ -1536,6 +1536,43 @@ kbd {
   color: var(--text-muted);
 }
 
+.chart-algo-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-complexity-badge {
+  font-family: var(--font-mono);
+  color: var(--accent-secondary);
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+.chart-metrics-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.chart-metric-pill {
+  font-size: 0.73rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.chart-metric-pill .metric-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
 .bar-pair {
   display: flex;
   flex-direction: column;

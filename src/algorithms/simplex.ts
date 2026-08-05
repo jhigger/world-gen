@@ -12,6 +12,7 @@ export class SimplexNoise implements TerrainAlgorithm {
   name = 'Simplex Noise (2001)';
   badge = 'Optimal';
   description = 'Divides space into a simplex grid (triangles in 2D), reducing directional artifacts and lowering coordinate computation scaling cost to O(N²).';
+  complexity = 'O(octaves)';
 
   private p: number[] = new Array(512);
   private currentSeed: number = -1;

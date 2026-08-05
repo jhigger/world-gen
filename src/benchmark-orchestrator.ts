@@ -12,11 +12,34 @@ import { OffscreenBenchmarkManager } from './offscreen-benchmark';
 import { state, getResolvedBenchmarkDuration } from './state';
 import type { BenchmarkMode, TelemetryPayload } from './worker';
 
-export interface CompiledAlgoResult {
+export interface RawBenchmarkMetrics {
   avgFps: number;
   lowFps: number;
   avgFrameMs: number;
   lowFrameMs: number;
+}
+
+export interface CompiledAlgoResult extends RawBenchmarkMetrics {
+  perSampleUs: number;
+  memoryKB: number;
+  complexity: string;
+}
+
+export function enrichAlgoMetrics(raw: RawBenchmarkMetrics, algoIdx: number, resolution: number): CompiledAlgoResult {
+  const totalSamples = resolution * resolution;
+  const exactFrameMs = raw.avgFps > 0 ? 1000 / raw.avgFps : raw.avgFrameMs;
+  const perSampleUs = exactFrameMs > 0 && totalSamples > 0
+    ? parseFloat(((exactFrameMs * 1000) / totalSamples).toFixed(3))
+    : 0;
+  const memoryKB = parseFloat(((totalSamples * 4) / 1024).toFixed(1));
+  const complexity = availableAlgorithms[algoIdx]?.complexity || '';
+
+  return {
+    ...raw,
+    perSampleUs,
+    memoryKB,
+    complexity,
+  };
 }
 
 export interface BenchmarkOrchestratorUI {
@@ -57,7 +80,7 @@ export class WorkerBenchmarkAccumulator {
     }
   }
 
-  getCompiledResult(): CompiledAlgoResult {
+  getCompiledResult(): RawBenchmarkMetrics {
     if (this.sampleCount === 0) {
       return { avgFps: 0, lowFps: 0, avgFrameMs: 0, lowFrameMs: 0 };
     }
@@ -199,6 +222,9 @@ export class BenchmarkOrchestrator {
         lowFps: m.lowFps,
         avgFrameMs: m.avgFrameMs,
         lowFrameMs: m.lowFrameMs,
+        perSampleUs: m.perSampleUs,
+        memoryKB: m.memoryKB,
+        complexity: m.complexity,
       };
     });
 
@@ -210,7 +236,14 @@ export class BenchmarkOrchestrator {
         <div class="chart-row">
           <div class="chart-algo-header">
             <span class="chart-algo-name">${metricItem.name}</span>
-            <span class="chart-algo-badge">${metricItem.badge}</span>
+            <div class="chart-algo-tags">
+              <span class="chart-algo-badge">${metricItem.badge}</span>
+              <span class="chart-algo-badge chart-complexity-badge">${metricItem.complexity}</span>
+            </div>
+          </div>
+          <div class="chart-metrics-strip">
+            <span class="chart-metric-pill"><span class="metric-label">Per-sample</span> ${metricItem.perSampleUs}µs</span>
+            <span class="chart-metric-pill"><span class="metric-label">Memory</span> ${metricItem.memoryKB} KB</span>
           </div>
           <div class="bar-pair">
             <div class="bar-wrapper">
@@ -300,7 +333,7 @@ export class BenchmarkOrchestrator {
       lowFrameMs = maxFrameMs > 0 ? parseFloat(maxFrameMs.toFixed(2)) : avgFrameMs;
     }
 
-    return { avgFps, lowFps, avgFrameMs, lowFrameMs };
+    return enrichAlgoMetrics({ avgFps, lowFps, avgFrameMs, lowFrameMs }, i, state.resolution);
   }
 
   public recordResultsForAlgo(idx: number): void {
@@ -308,9 +341,9 @@ export class BenchmarkOrchestrator {
     if (selectedMode === 'vsync') {
       this.compiledAlgoResults[idx] = this.extractAlgorithmMetrics(idx);
     } else {
-      const compiled = this.accumulator.getCompiledResult();
-      if (compiled.avgFps > 0) {
-        this.compiledAlgoResults[idx] = compiled;
+      const raw = this.accumulator.getCompiledResult();
+      if (raw.avgFps > 0) {
+        this.compiledAlgoResults[idx] = enrichAlgoMetrics(raw, idx, state.resolution);
       } else {
         this.compiledAlgoResults[idx] = this.extractAlgorithmMetrics(idx);
       }

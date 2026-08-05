@@ -11,6 +11,7 @@ export class PerlinNoise implements TerrainAlgorithm {
   name = 'Perlin Noise (1983)';
   badge = 'Standard';
   description = 'Generates hermitically interpolated pseudo-random gradients. Offers smooth continuous transitions with first-order spatial coherence.';
+  complexity = 'O(octaves)';
 
   // Permutation table duplicated to 512 to avoid index out-of-bounds checks in the hot loop
   private p: number[] = new Array(512);

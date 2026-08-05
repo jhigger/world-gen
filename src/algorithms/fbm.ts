@@ -17,6 +17,7 @@ export class FBMNoise implements TerrainAlgorithm {
   name = 'Fractional Brownian Motion (1968)';
   badge = 'fBm';
   description = 'Layers octaves of gradient noise with domain warping to produce self-similar fractal terrain with organic, swirling continental features.';
+  complexity = 'O(3 × octaves)';
 
   private p: number[] = new Array(512);
   private currentSeed: number = -1;
