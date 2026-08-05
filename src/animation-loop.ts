@@ -178,7 +178,7 @@ export class AnimationLoop {
     }
 
     // 3. Drive continuous wave motion when erosion is inactive AND there is no paused eroded state
-    const hasCachedHeightmap = state.heightmapCache.some((cache: any) => cache !== null);
+    const hasCachedHeightmap = state.heightmapCache.some((cache: number[][] | null) => cache !== null);
     if (!state.isErosionActive && !hasCachedHeightmap && !benchmarkSuite.isActive()) {
       state.animationTime += dt * 0.55 * state.noiseSpeed;
       state.params.offsetX = state.animationTime * 1.8;
@@ -202,7 +202,7 @@ export class AnimationLoop {
         if (state._erosionElapsedTime >= targetSec) {
           state.isErosionActive = false;
           uiManager.syncErosionButtonUI();
-          if (uiManager.lblErosionProgress) uiManager.lblErosionProgress.textContent = `Paused at ${targetSec.toFixed(1)}s`;
+          if (uiManager.lblErosionProgress) uiManager.lblErosionProgress.textContent = `Finished at ${targetSec.toFixed(1)}s`;
         }
       }
 

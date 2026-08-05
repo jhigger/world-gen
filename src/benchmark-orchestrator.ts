@@ -25,13 +25,15 @@ export interface CompiledAlgoResult extends RawBenchmarkMetrics {
   complexity: string;
 }
 
+export const BYTES_PER_FLOAT32 = 4;
+
 export function enrichAlgoMetrics(raw: RawBenchmarkMetrics, algoIdx: number, resolution: number): CompiledAlgoResult {
   const totalSamples = resolution * resolution;
   const exactFrameMs = raw.avgFps > 0 ? 1000 / raw.avgFps : raw.avgFrameMs;
   const perSampleUs = exactFrameMs > 0 && totalSamples > 0
     ? parseFloat(((exactFrameMs * 1000) / totalSamples).toFixed(3))
     : 0;
-  const memoryKB = parseFloat(((totalSamples * 4) / 1024).toFixed(1));
+  const memoryKB = parseFloat(((totalSamples * BYTES_PER_FLOAT32) / 1024).toFixed(1));
   const complexity = availableAlgorithms[algoIdx]?.complexity || '';
 
   return {

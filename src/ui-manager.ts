@@ -31,11 +31,25 @@ export interface UIManagerCallbacks {
   getSphericalCameraSnapshot?: () => { zoom: number; pitch: number; yaw: number; offsetX: number; offsetY: number; offsetZ: number } | undefined;
 }
 
+export interface MetricCardElements {
+  fps: HTMLSpanElement | null;
+  frametime: HTMLSpanElement | null;
+  time: HTMLSpanElement | null;
+  math: HTMLSpanElement | null;
+  ruggedness: HTMLSpanElement | null;
+  fpsAvg: HTMLSpanElement | null;
+  frametimeAvg: HTMLSpanElement | null;
+  timeAvg: HTMLSpanElement | null;
+  mathAvg: HTMLSpanElement | null;
+  ruggednessAvg: HTMLSpanElement | null;
+}
+
 export class UIManager {
   private erosionElapsedTime = 0;
   private callbacks: UIManagerCallbacks | null = null;
   private viewportManager: ViewportManager | null = null;
-  private cachedMetricElements: Record<number, any> = {};
+  private cachedMetricElements: Record<number, MetricCardElements> = {};
+  private debouncedStorageTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Cached DOM elements
   public gridContainer = getDomElement<HTMLDivElement>('terrain-grid');
@@ -117,10 +131,11 @@ export class UIManager {
   public valBenchTotalFrames = getDomElement<HTMLSpanElement>('bench-total-frames');
 
   getErosionElapsedTime(): number {
-    return this.erosionElapsedTime;
+    return state._erosionElapsedTime || 0;
   }
 
   setErosionElapsedTime(time: number): void {
+    state._erosionElapsedTime = time;
     this.erosionElapsedTime = time;
   }
 
@@ -159,7 +174,6 @@ export class UIManager {
 
       const configPaths = [
         'resolution',
-        'isErosionActive',
         'activePalette',
         'params.seed',
         'params.scale',
@@ -181,7 +195,7 @@ export class UIManager {
     this.setupMathAnalysisToggle();
   }
 
-  public getCachedMetricElements(index: number): any {
+  public getCachedMetricElements(index: number): MetricCardElements | null {
     if (!this.cachedMetricElements[index] && typeof document !== 'undefined') {
       this.cachedMetricElements[index] = {
         fps: document.getElementById(`fps-${index}`),
@@ -225,9 +239,25 @@ export class UIManager {
     });
   }
 
-  public updateStorage(): void {
-    const snap = this.viewportManager?.getSphericalCameraSnapshot() || this.callbacks?.getSphericalCameraSnapshot?.();
-    saveConfig(snap);
+  public updateStorage(immediate: boolean = false): void {
+    if (immediate) {
+      if (this.debouncedStorageTimer) {
+        clearTimeout(this.debouncedStorageTimer);
+        this.debouncedStorageTimer = null;
+      }
+      const snap = this.viewportManager?.getSphericalCameraSnapshot() || this.callbacks?.getSphericalCameraSnapshot?.();
+      saveConfig(snap);
+      return;
+    }
+
+    if (this.debouncedStorageTimer) {
+      clearTimeout(this.debouncedStorageTimer);
+    }
+    this.debouncedStorageTimer = setTimeout(() => {
+      this.debouncedStorageTimer = null;
+      const snap = this.viewportManager?.getSphericalCameraSnapshot() || this.callbacks?.getSphericalCameraSnapshot?.();
+      saveConfig(snap);
+    }, 300);
   }
 
   public updateUIStrings(): void {
@@ -290,7 +320,10 @@ export class UIManager {
       if (this.iconErosionPlay) this.iconErosionPlay.style.display = 'none';
       if (this.iconErosionPause) this.iconErosionPause.style.display = 'block';
     } else {
-      if (this.lblErosion) this.lblErosion.textContent = this.erosionElapsedTime > 0 ? 'Resume Erosion' : 'Play Erosion';
+      const targetSec = getResolvedErosionDuration();
+      const isFinished = targetSec !== 'infinite' && this.getErosionElapsedTime() >= targetSec;
+      const isPaused = this.getErosionElapsedTime() > 0 && !isFinished;
+      if (this.lblErosion) this.lblErosion.textContent = isPaused ? 'Resume Erosion' : 'Start Erosion';
       if (this.iconErosionPlay) this.iconErosionPlay.style.display = 'block';
       if (this.iconErosionPause) this.iconErosionPause.style.display = 'none';
     }
@@ -654,8 +687,9 @@ export class UIManager {
       if (state.isErosionActive) {
         const targetSec = getResolvedErosionDuration();
         if (targetSec !== 'infinite') {
-          if (this.erosionElapsedTime >= targetSec) {
-            this.erosionElapsedTime = 0;
+          if (this.getErosionElapsedTime() >= targetSec) {
+            this.callbacks?.onClearCaches?.();
+            this.setErosionElapsedTime(0);
           }
         }
         if (this.erosionStatusBadge) this.erosionStatusBadge.classList.remove('hidden');
@@ -666,7 +700,7 @@ export class UIManager {
     if (this.btnResetErosion) {
       this.btnResetErosion.addEventListener('click', () => {
         this.callbacks?.onClearCaches?.();
-        this.erosionElapsedTime = 0;
+        this.setErosionElapsedTime(0);
         if (this.erosionStatusBadge) this.erosionStatusBadge.classList.add('hidden');
         this.syncErosionButtonUI();
       });
