@@ -319,6 +319,14 @@
             <p><strong>Significance:</strong> Capping frame rates helps reduce CPU/GPU temperatures and power draw, especially on laptops.</p>
           </div>
         </div>
+        <div class="control-group hidden has-tooltip" id="custom-fps-container">
+          <label for="param-custom-fps">Custom FPS Cap: <input type="number" id="val-custom-fps" class="val-input" min="15" max="240" step="5" value="60"></label>
+          <input type="range" id="param-custom-fps" min="15" max="240" step="5" value="60">
+          <div class="tooltip-box">
+            <h5>Custom FPS Cap</h5>
+            <p class="tooltip-desc">Enter a custom numerical refresh rate limit between 15 and 240 FPS.</p>
+          </div>
+        </div>
         <div class="control-group has-tooltip">
           <label for="select-benchmark-mode">Benchmark Mode: <span id="val-benchmark-mode">Offscreen WebGL</span></label>
           <select id="select-benchmark-mode">
@@ -329,14 +337,6 @@
           <div class="tooltip-box">
             <h5>Benchmark Mode</h5>
             <p class="tooltip-desc">Select benchmark execution mode: Offscreen WebGL (unthrottled worker GPU loop with gl.finish), Headless Math (raw worker CPU noise throughput), or VSync rAF (main thread animation loop).</p>
-          </div>
-        </div>
-        <div class="control-group hidden has-tooltip" id="custom-fps-container">
-          <label for="param-custom-fps">Custom FPS Cap: <input type="number" id="val-custom-fps" class="val-input" min="15" max="240" step="5" value="60"></label>
-          <input type="range" id="param-custom-fps" min="15" max="240" step="5" value="60">
-          <div class="tooltip-box">
-            <h5>Custom FPS Cap</h5>
-            <p class="tooltip-desc">Enter a custom numerical refresh rate limit between 15 and 240 FPS.</p>
           </div>
         </div>
         <button id="btn-benchmark" class="btn-primary has-tooltip">
