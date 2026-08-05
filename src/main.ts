@@ -53,6 +53,7 @@ if (typeof window !== 'undefined') {
       onStartBenchmarkForCurrentMode: () => orchestrator.startBenchmarkForCurrentMode(),
       onCloseBenchmarkResultsModal: () => orchestrator.closeBenchmarkResultsModal(),
       onClearCaches: clearHeightmapCaches,
+      onResetMetrics: () => orchestrator.resetAllMetricsTrackers(),
       onBenchmarkModeChange: (mode: BenchmarkMode) => orchestrator.setBenchmarkMode(mode),
     });
 
@@ -61,6 +62,14 @@ if (typeof window !== 'undefined') {
     }
 
     loadConfig();
+    viewportManager.applySavedCameraState({
+      zoom: state.savedZoom,
+      yaw: state.savedYaw,
+      pitch: state.savedPitch,
+      offsetX: state.cameraOffsetX,
+      offsetY: state.cameraOffsetY,
+      offsetZ: state.cameraOffsetZ,
+    });
     uiManager.syncDOMToState();
 
     requestAnimationFrame(() => {

@@ -27,6 +27,7 @@ export interface UIManagerCallbacks {
   onCloseBenchmarkResultsModal?: () => void;
   onBenchmarkModeChange?: (mode: BenchmarkMode) => void;
   onClearCaches?: () => void;
+  onResetMetrics?: () => void;
   getSphericalCameraSnapshot?: () => { zoom: number; pitch: number; yaw: number; offsetX: number; offsetY: number; offsetZ: number } | undefined;
 }
 
@@ -135,8 +136,41 @@ export class UIManager {
       this.updateUIStrings();
       this.updateStorage();
 
+      if (path === 'viewMode' || path === 'focusedIndex') {
+        const { viewMode, focusedIndex } = stateObs.data;
+        this.viewportManager?.setGridMode(viewMode, focusedIndex);
+        this.handleGridModeChange(viewMode, focusedIndex);
+      }
+
       if (path === 'showMetrics') {
         this.applyShowMetricsState();
+      }
+
+      if (['savedZoom', 'savedYaw', 'savedPitch', 'cameraOffsetX', 'cameraOffsetY', 'cameraOffsetZ'].includes(path)) {
+        this.viewportManager?.applySavedCameraState({
+          zoom: stateObs.data.savedZoom,
+          yaw: stateObs.data.savedYaw,
+          pitch: stateObs.data.savedPitch,
+          offsetX: stateObs.data.cameraOffsetX,
+          offsetY: stateObs.data.cameraOffsetY,
+          offsetZ: stateObs.data.cameraOffsetZ,
+        });
+      }
+
+      const configPaths = [
+        'resolution',
+        'isErosionActive',
+        'activePalette',
+        'params.seed',
+        'params.scale',
+        'params.octaves',
+        'params.persistence',
+        'params.heightScale',
+        'params.widthScale',
+      ];
+      if (configPaths.includes(path)) {
+        this.callbacks?.onClearCaches?.();
+        this.callbacks?.onResetMetrics?.();
       }
     });
 
@@ -347,6 +381,15 @@ export class UIManager {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('terrainforge_config');
     }
+    this.viewportManager?.applySavedCameraState({
+      zoom: state.savedZoom,
+      yaw: state.savedYaw,
+      pitch: state.savedPitch,
+      offsetX: state.cameraOffsetX,
+      offsetY: state.cameraOffsetY,
+      offsetZ: state.cameraOffsetZ,
+    });
+    this.callbacks?.onResetMetrics?.();
     this.syncDOMToState();
   }
 

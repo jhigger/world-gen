@@ -2,6 +2,8 @@ import { state, TerrainConfig } from './state';
 import { ColorPalette } from './renderer';
 
 export function saveConfig(cameraSnapshot?: { zoom: number; yaw: number; pitch: number; offsetX: number; offsetY: number; offsetZ: number }) {
+  if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return;
+
   const config: TerrainConfig = {
     resolution: state.resolution,
     heightScale: state.params.heightScale,
@@ -62,6 +64,7 @@ export function saveConfig(cameraSnapshot?: { zoom: number; yaw: number; pitch: 
 }
 
 export function loadConfig() {
+  if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return;
   try {
     const raw = localStorage.getItem('terrainforge_config');
     if (raw) {

@@ -144,6 +144,11 @@ export class BenchmarkOrchestrator {
     this.accumulator.recordSample(fps, maxMathTimeMs, maxRenderTimeMs);
   }
 
+  public resetAllMetricsTrackers(): void {
+    this.metricsTrackers.forEach((t) => t.clear());
+    this.accumulator.reset();
+  }
+
   public recordStats(index: number, stats: { renderTime: number; mathTime: number; ruggedness: number }): void {
     const tracker = this.metricsTrackers[index];
     if (tracker) {

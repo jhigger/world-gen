@@ -15,16 +15,13 @@ export class WorleyNoise implements TerrainAlgorithm {
   description = 'Calculates distances to nearest seed points. Produces cellular geometric patterns suited for stone, scales, or dry valley structures.';
 
   /**
-   * Sin-based 2D pseudo-random hash function.
-   * 
-   * Returns two float values in [0, 1] representing the coordinate offset
-   * of the feature point inside the unit grid cell (cx, cy). Uses high frequency
-   * fractional trigonometric products to avoid visible repetitive tiling.
+   * Deterministic 32-bit unsigned cell seed.
    */
-  private hash2d(cx: number, cy: number, seed: number): [number, number] {
-    const x = Math.sin(cx * 127.1 + cy * 311.7 + seed * 42.1) * 43758.5453123;
-    const y = Math.sin(cx * 269.5 + cy * 183.3 + seed * 85.3) * 43758.5453123;
-    return [x - Math.floor(x), y - Math.floor(y)];
+  private cellSeed(x: number, y: number, seed: number): number {
+    let h = (seed ^ (x * 1619) ^ (y * 31337)) >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+    h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+    return (h ^ (h >>> 16)) >>> 0;
   }
 
   /**
@@ -38,6 +35,7 @@ export class WorleyNoise implements TerrainAlgorithm {
     const iy = Math.floor(y);
     const fx = x - ix;
     const fy = y - iy;
+    const norm = 2.3283064365386963e-10;
 
     let minDistance = 999.0;
 
@@ -47,8 +45,11 @@ export class WorleyNoise implements TerrainAlgorithm {
         const neighborX = ix + dx;
         const neighborY = iy + dy;
 
-        // Get seed point location inside the neighbor cell
-        const [px, py] = this.hash2d(neighborX, neighborY, seed);
+        let s = this.cellSeed(neighborX, neighborY, seed);
+        s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+        const px = s * norm;
+        s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+        const py = s * norm;
 
         // Vector from pixel position to neighbor seed point
         const diffX = dx + px - fx;

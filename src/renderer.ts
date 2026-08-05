@@ -74,6 +74,7 @@ export class TerrainRenderer {
     ruggedness: 0,
     minElevation: 0,
     maxElevation: 0,
+    mathTime: 0,
     startTime: 0
   };
 
@@ -241,6 +242,7 @@ export class TerrainRenderer {
     let ruggedness = cache.ruggedness;
     let minElevation = cache.minElevation;
     let maxElevation = cache.maxElevation;
+    let mathTime = cache.mathTime;
 
     // 3. Re-create geometry if the resolution changes
     if (!this.geometry || this.geometry.parameters.widthSegments !== resolution - 1) {
@@ -290,6 +292,8 @@ export class TerrainRenderer {
       let sumSq = 0;
       let count = 0;
       const mathStart = performance.now();
+      minElevation = Infinity;
+      maxElevation = -Infinity;
 
       for (let y = 0; y < resolution; y++) {
         for (let x = 0; x < resolution; x++) {
@@ -312,7 +316,10 @@ export class TerrainRenderer {
         }
       }
 
-      const mathTime = performance.now() - mathStart;
+      if (minElevation === Infinity) minElevation = 0;
+      if (maxElevation === -Infinity) maxElevation = 0;
+
+      mathTime = performance.now() - mathStart;
       const mean = sum / count;
       ruggedness = Math.sqrt(Math.max(0, (sumSq / count) - (mean * mean)));
       
@@ -331,19 +338,10 @@ export class TerrainRenderer {
         ruggedness,
         minElevation,
         maxElevation,
+        mathTime,
         startTime
       };
       this.lastParams = { ...params };
-
-      if (this.onStatsUpdate) {
-        this.onStatsUpdate({
-          renderTime: performance.now() - startTime,
-          mathTime,
-          ruggedness,
-          minElevation,
-          maxElevation
-        });
-      }
     }
 
     // Render the scene to the WebGL canvas
@@ -351,12 +349,22 @@ export class TerrainRenderer {
 
     const totalTime = performance.now() - startTime;
 
+    if (this.onStatsUpdate) {
+      this.onStatsUpdate({
+        renderTime: totalTime,
+        mathTime,
+        ruggedness,
+        minElevation,
+        maxElevation
+      });
+    }
+
     return {
       minElevation,
       maxElevation,
       ruggedness,
       renderTime: totalTime,
-      mathTime: totalTime // For sync, it's roughly the same
+      mathTime
     };
   }
 

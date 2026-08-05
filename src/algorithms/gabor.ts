@@ -25,14 +25,13 @@ export class GaborNoiseAlgorithm implements TerrainAlgorithm {
   impulsesPerCell: number = 8;           // Number of Poisson impulses per grid cell
 
   /**
-   * Deterministic hash to generate pseudo-random numbers per cell and impulse.
+   * Deterministic 32-bit unsigned cell seed.
    */
-  private hash3D(x: number, y: number, seed: number): number {
+  private cellSeed(x: number, y: number, seed: number): number {
     let h = (seed ^ (x * 1619) ^ (y * 31337)) >>> 0;
     h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
     h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
-    h = (h ^ (h >>> 16)) >>> 0;
-    return h / 4294967295;
+    return (h ^ (h >>> 16)) >>> 0;
   }
 
   /**
@@ -47,23 +46,34 @@ export class GaborNoiseAlgorithm implements TerrainAlgorithm {
     const negPiK2 = -Math.PI * K2;
     // Envelope threshold < 0.0001 corresponds to negPiK2 * distSq < -9.21034 => distSq > 9.21034 / (Math.PI * K2)
     const maxDistSq = 9.21034 / (Math.PI * K2);
+    // Match search window to Gaussian support — 3x3 is too small when sqrt(maxDistSq) > 1
+    const cellRadius = Math.ceil(Math.sqrt(maxDistSq));
     const f0 = this.frequency;
     const twoPiF0 = 2.0 * Math.PI * f0;
     const cosTheta = Math.cos(this.orientationAngle);
     const sinTheta = Math.sin(this.orientationAngle);
+    const norm = 2.3283064365386963e-10; // 1 / 4294967296.0
 
     let sum = 0;
 
-    // Convolve over neighboring cells (3x3 grid around current cell)
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
+    // Convolve over neighboring cells within the Gaussian support radius
+    for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+      for (let dx = -cellRadius; dx <= cellRadius; dx++) {
         const cx = cellX + dx;
         const cy = cellY + dy;
 
-        // Generate impulses for cell (cx, cy)
+        let s = this.cellSeed(cx, cy, seed);
+
+        // Generate impulses for cell (cx, cy) using fast LCG
         for (let i = 0; i < this.impulsesPerCell; i++) {
-          const r1 = this.hash3D(cx, cy, seed + i * 4);
-          const r2 = this.hash3D(cx, cy, seed + i * 4 + 1);
+          s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+          const r1 = s * norm;
+          s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+          const r2 = s * norm;
+          s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+          const r3 = s * norm;
+          s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+          const r4 = s * norm;
 
           const xi = cx + r1;
           const yi = cy + r2;
@@ -72,11 +82,8 @@ export class GaborNoiseAlgorithm implements TerrainAlgorithm {
           const ry = y - yi;
           const distSq = rx * rx + ry * ry;
 
-          // Early distance pruning BEFORE expensive exponential and hash calculations
+          // Early distance pruning BEFORE expensive exponential and trigonometric calculations
           if (distSq > maxDistSq) continue;
-
-          const r3 = this.hash3D(cx, cy, seed + i * 4 + 2);
-          const r4 = this.hash3D(cx, cy, seed + i * 4 + 3);
 
           const ai = r3 * 2.0 - 1.0; // Random amplitude in [-1, 1]
           const phi = r4 * 2.0 * Math.PI; // Random phase in [0, 2pi)
