@@ -90,6 +90,7 @@ export type WorkerInitMessage = {
   algorithmName: string;
   params: TerrainParams;
   mode?: BenchmarkMode;
+  canvasFpsCap?: number;
 };
 
 export type WorkerSetModeMessage = {
@@ -109,6 +110,7 @@ export type WorkerUpdateParamsMessage = {
   resolution?: number;
   params?: Partial<TerrainParams>;
   mode?: BenchmarkMode;
+  canvasFpsCap?: number;
 };
 
 export type WorkerStartMessage = {
@@ -156,6 +158,7 @@ let currentPixelRatio = 1;
 
 // Benchmark Execution Mode
 let currentMode: BenchmarkMode = 'offscreen';
+let canvasFpsCap = 60;
 
 // Static pre-allocated TypedArrays for Zero-GC in-place mutation
 let currentResolution = 64;
@@ -404,9 +407,10 @@ function runBenchmarkIteration(): void {
     gl.flush();
     renderTimeMs = performance.now() - tRenderStart;
 
-    // 3. Present visual preview to presentation canvas at 60Hz using zero-copy transferFromImageBitmap
+    // 3. Present visual preview to presentation canvas dynamically capped by canvasFpsCap using zero-copy transferFromImageBitmap
     const now = performance.now();
-    if (now - lastVisualPresentTime >= 16 && presentationBitmapCtx && standaloneCanvas) {
+    const visualPresentIntervalMs = 1000 / (canvasFpsCap > 0 ? canvasFpsCap : 60);
+    if (now - lastVisualPresentTime >= visualPresentIntervalMs - 0.5 && presentationBitmapCtx && standaloneCanvas) {
       lastVisualPresentTime = now;
       try {
         const bitmap = standaloneCanvas.transferToImageBitmap();
@@ -593,6 +597,7 @@ self.onmessage = (e: MessageEvent<any>) => {
       activeParams = { ...activeParams, ...data.params };
       currentResolution = data.resolution;
       if (data.mode) currentMode = data.mode;
+      if (typeof data.canvasFpsCap === 'number') canvasFpsCap = data.canvasFpsCap;
       resetWorkerAccumulators();
       if (data.canvas) {
         initThreeScene(data.canvas, data.width, data.height, data.pixelRatio);
@@ -632,6 +637,7 @@ self.onmessage = (e: MessageEvent<any>) => {
         setupGeometry(data.resolution);
       }
       if (data.mode) currentMode = data.mode;
+      if (typeof data.canvasFpsCap === 'number') canvasFpsCap = data.canvasFpsCap;
       resetWorkerAccumulators();
       break;
     }

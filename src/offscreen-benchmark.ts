@@ -36,6 +36,7 @@ export class OffscreenBenchmarkManager {
    * @param resolution Grid resolution.
    * @param onTelemetry Telemetry callback invoked on every 100ms batched report.
    * @param mode Benchmark engine execution mode ('offscreen' | 'headless' | 'vsync').
+   * @param canvasFpsCap Visual FPS presentation cap for canvas updates.
    */
   public initialize(
     canvas: HTMLCanvasElement,
@@ -44,7 +45,8 @@ export class OffscreenBenchmarkManager {
     params: TerrainParams,
     resolution: number,
     onTelemetry: (telemetry: TelemetryPayload) => void,
-    mode: BenchmarkMode = 'offscreen'
+    mode: BenchmarkMode = 'offscreen',
+    canvasFpsCap: number = 60
   ): boolean {
     if (!OffscreenBenchmarkManager.isSupported()) {
       console.warn('OffscreenCanvas or Web Workers are not supported in this environment.');
@@ -82,6 +84,7 @@ export class OffscreenBenchmarkManager {
         algorithmName,
         params,
         mode,
+        canvasFpsCap,
       };
 
       this.worker.postMessage(initMessage, [offscreen]);
@@ -149,7 +152,8 @@ export class OffscreenBenchmarkManager {
     algorithmName?: string,
     resolution?: number,
     params?: Partial<TerrainParams>,
-    mode?: BenchmarkMode
+    mode?: BenchmarkMode,
+    canvasFpsCap?: number
   ): void {
     if (!this.worker) return;
     if (mode) {
@@ -161,6 +165,7 @@ export class OffscreenBenchmarkManager {
       resolution,
       params,
       mode,
+      canvasFpsCap,
     };
     this.worker.postMessage(msg);
   }

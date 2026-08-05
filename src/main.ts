@@ -143,7 +143,8 @@ function ensureOffscreenBenchmarkInitialized(): boolean {
         workerAccumulator.recordSample(telemetry.fps, telemetry.maxMathTimeMs, telemetry.maxRenderTimeMs);
       }
     },
-    selectedMode
+    selectedMode,
+    state.canvasFpsCap
   );
 
   isOffscreenInitialized = success;
@@ -238,12 +239,12 @@ stateObservable.subscribe((path) => {
     clearHeightmapCaches();
   }
 
-  if (offscreenBenchmark.getIsRunning() && (path.startsWith('params') || path === 'resolution' || path === 'focusedIndex')) {
+  if (offscreenBenchmark.getIsRunning() && (path.startsWith('params') || path === 'resolution' || path === 'focusedIndex' || path === 'canvasFpsCap')) {
     const activeIdx = isSequentialBenchmarkRunning 
       ? currentBenchmarkAlgoIndex 
       : (state.focusedIndex >= 0 && state.focusedIndex < availableAlgorithms.length ? state.focusedIndex : 0);
     const algoName = availableAlgorithms[activeIdx].name;
-    offscreenBenchmark.updateParams(algoName, state.resolution, state.params);
+    offscreenBenchmark.updateParams(algoName, state.resolution, state.params, undefined, state.canvasFpsCap);
   }
 
   // Viewport/Camera subscriptions
@@ -989,7 +990,7 @@ function startBenchmarkForAlgo(idx: number): void {
     const initialized = ensureOffscreenBenchmarkInitialized();
     if (initialized) {
       const algoName = availableAlgorithms[idx].name;
-      offscreenBenchmark.updateParams(algoName, state.resolution, state.params, selectedMode);
+      offscreenBenchmark.updateParams(algoName, state.resolution, state.params, selectedMode, state.canvasFpsCap);
       offscreenBenchmark.setMode(selectedMode);
       offscreenBenchmark.start();
 
@@ -1183,15 +1184,15 @@ function updateCardMetricPair(curEl: HTMLElement | null, avgEl: HTMLElement | nu
   }
 }
 
+let lastDomMetricUpdate = 0;
+
 function animationLoop() {
   const now = performance.now();
 
-  // FPS limit control for main-thread UI rendering
-  // When 'uncapped', main thread UI runs at native display VSync (via requestAnimationFrame) for zero lag.
-  if (state.fpsLimit !== 'uncapped') {
-    const parsedFps = state.fpsLimit === 'custom' ? state.customFps : parseInt(state.fpsLimit);
-    const targetFps = isNaN(parsedFps) || parsedFps <= 0 ? 60 : parsedFps;
-    const frameInterval = 1000 / targetFps;
+  // Canvas Visual Cap for main-thread UI rendering (decoupled from calculation throughput fpsLimit)
+  const targetCanvasFps = state.canvasFpsCap || 60;
+  if (targetCanvasFps < 60) {
+    const frameInterval = 1000 / targetCanvasFps;
     const elapsed = now - lastRenderTime;
 
     if (elapsed < frameInterval - 1.0) {
@@ -1396,7 +1397,9 @@ function animationLoop() {
       const avgRenderTime = metricsTrackers[i].getGlobalAverageRenderTime();
       const avgRuggedness = metricsTrackers[i].getGlobalAverageRuggedness();
 
-      if (els) {
+      const shouldUpdateDomMetrics = now - lastDomMetricUpdate >= 100;
+
+      if (els && shouldUpdateDomMetrics) {
         const focusedIdx = activeFocusedIdx >= 0 && activeFocusedIdx < availableAlgorithms.length ? activeFocusedIdx : 0;
         if (offscreenBenchmark.getIsRunning() && i === focusedIdx && latestWorkerTelemetry) {
           const t = latestWorkerTelemetry;
@@ -1425,8 +1428,10 @@ function animationLoop() {
     }
   }
 
-  // 6. Display aggregated benchmark summaries
-  if (benchmarkSuite.isActive() || isSequentialBenchmarkRunning) {
+  const shouldUpdateDomMetrics = now - lastDomMetricUpdate >= 100;
+
+  // 6. Display aggregated benchmark summaries (throttled to 100ms / 10 Hz)
+  if (shouldUpdateDomMetrics && (benchmarkSuite.isActive() || isSequentialBenchmarkRunning)) {
     if (offscreenBenchmark.getIsRunning() && latestWorkerTelemetry) {
       const t = latestWorkerTelemetry;
       const fpsStr = `${t.fps} FPS`;
@@ -1455,6 +1460,10 @@ function animationLoop() {
       if (valBenchMathTime) valBenchMathTime.textContent = `${avgMath} ms`;
       if (valBenchTotalFrames) valBenchTotalFrames.textContent = `VSync Loop`;
     }
+  }
+
+  if (shouldUpdateDomMetrics) {
+    lastDomMetricUpdate = now;
   }
 
   requestAnimationFrame(animationLoop);

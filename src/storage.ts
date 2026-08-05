@@ -23,6 +23,7 @@ export function saveConfig(cameraSnapshot?: { zoom: number; yaw: number; pitch: 
     noiseSpeed: state.noiseSpeed,
     fpsLimit: state.fpsLimit,
     customFps: state.customFps,
+    canvasFpsCap: state.canvasFpsCap,
     uiScale: state.uiScale
   };
 
@@ -85,6 +86,7 @@ export function loadConfig() {
       if (typeof config.noiseSpeed === 'number') state.noiseSpeed = config.noiseSpeed;
       if (typeof config.fpsLimit === 'string') state.fpsLimit = config.fpsLimit;
       if (typeof config.customFps === 'number') state.customFps = config.customFps;
+      if (typeof config.canvasFpsCap === 'number') state.canvasFpsCap = config.canvasFpsCap;
       if (typeof config.uiScale === 'number') state.uiScale = config.uiScale;
 
       if (typeof config.zoom === 'number') state.savedZoom = config.zoom;

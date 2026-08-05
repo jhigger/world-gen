@@ -23,6 +23,7 @@ export interface TerrainConfig {
   noiseSpeed: number;
   fpsLimit: string;
   customFps: number;
+  canvasFpsCap: number;
   uiScale: number;
   zoom?: number;
   yaw?: number;
@@ -58,6 +59,7 @@ const initialState = {
   noiseSpeed: 0.0,
   fpsLimit: 'uncapped',
   customFps: 60,
+  canvasFpsCap: 60,
   uiScale: 100,
   savedZoom: 180,
   savedYaw: 0.8,
@@ -112,6 +114,7 @@ export function resetStateToDefaults() {
   state.noiseSpeed = 0.0;
   state.fpsLimit = 'uncapped';
   state.customFps = 60;
+  state.canvasFpsCap = 60;
   state.uiScale = 100;
 
   state.savedZoom = 180;

@@ -17,6 +17,8 @@
 - **Viewport Resize Synchronization**: The worker-side updating of WebGL viewport dimensions (`renderer.setSize(w, h, false)`) and camera projection matrices driven by main-thread `ResizeObserver` events.
 - **Flat Heightmap Evaluation**: The direct population of a contiguous 1D `Float32Array` heightmap buffer via point-wise evaluation functions, avoiding 2D nested array heap allocations.
 - **Headless Math Benchmark**: A non-rendering compute execution mode within a Web Worker that repeatedly evaluates a `TerrainAlgorithm` or `TerrainPipeline` on pre-allocated buffers using microtasks (`MessageChannel` / `queueMicrotask`), measuring raw throughput in heightmap evaluations per second without GPU context overhead.
+- **Canvas Visual Cap**: The independent frame rate limit governing WebGL scene rendering and image bitmap presentation to the canvas, operating decoupled from the unthrottled calculation throughput rate.
+- **DOM Metric Throttling**: The rate-limiting of DOM textContent mutations for performance telemetry cards to a fixed interval (e.g. 100ms / 10 Hz) to eliminate layout thrashing and string garbage generation during high-frequency compute loops.
 
 
 
