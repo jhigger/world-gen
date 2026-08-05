@@ -34,16 +34,18 @@ This repository provides an **interactive, multi-threaded 3D benchmarking engine
 
 ---
 
-### 📊 3. Dual-Mode Unthrottled Benchmark Engine
+### 📊 3. Dual-Mode Unthrottled Benchmark Engine & Profiling Suite
 Bypass standard main-thread `requestAnimationFrame` VSync refresh rate limits (e.g., 60Hz / 144Hz / 180Hz) to measure absolute hardware compute limits:
 - **Offscreen WebGL Mode**: Offloads Three.js 3D rendering and mesh updating to a Web Worker via `OffscreenCanvas`, forcing GPU execution queue completion via `gl.finish()` and transferring 60Hz visual previews via zero-copy `ImageBitmap`.
 - **Headless CPU Math Mode**: Bypasses graphics rasterization entirely to measure pure CPU heightmap evaluation throughput (iterations/sec and math ms) over a zero-delay `MessageChannel` microtask loop.
 - **VSync rAF Mode**: Evaluates real-world UI experience locked to the browser display refresh rate.
+- **Automated Duration Presets**: Run benchmark tests with 1-minute, 5-minute, or 10-minute duration presets and custom duration controls for extended profiling.
+- **Big O Complexity & Heap Memory Tracking**: Real-time evaluation of algorithm time complexity (e.g., Gabor $O(392 \times \text{octaves})$), sample throughput, and JS heap memory allocation patterns.
 
 ---
 
 ### 📱 4. Mobile & Responsive Layout Architecture
-- **Adaptive UI Scale**: Dynamic scaling across desktop, tablet, and mobile displays.
+- **Adaptive UI Scale**: Dynamic scaling across desktop, tablet, and mobile displays with dedicated sidebar sections for camera flight controls and algorithm tuning.
 - **Mobile Bottom Sheet Drawer**: Touch-friendly collapsible drawer controls with gesture handles and modal dialogs.
 - **Hydraulic Erosion Simulation**: Interactive water drop erosion filter modeling terrain weathering over time.
 
@@ -101,14 +103,20 @@ world-gen/
 │   │   └── 0002-offscreen-worker-benchmark-engine.md
 │   └── agents/                 # Issue tracking and triage guidelines
 ├── src/
-│   ├── algorithms.ts           # 6 procedural noise & terrain generators
+│   ├── algorithms/             # Modularized procedural noise & terrain generators
+│   ├── animation-loop.ts       # Main-thread rAF dispatch and frame timing logic
+│   ├── benchmark-orchestrator.ts # Dual-mode benchmark loop, duration presets & timing controllers
 │   ├── benchmark.ts            # Performance metrics tracking & camera flight controller
-│   ├── main.ts                 # Main-thread state management, UI events & animation loop
+│   ├── main.ts                 # Main-thread entry point & module orchestration
 │   ├── observable-state.ts     # Deep Proxy reactive state store
 │   ├── offscreen-benchmark.ts   # Main-thread controller for offscreen worker benchmark engine
+│   ├── physics.ts              # Heightmap physics & terrain collision metrics
 │   ├── pipeline.ts             # Modular terrain pipeline and erosion filter framework
 │   ├── renderer.ts             # Three.js WebGL viewport renderer
 │   ├── state.ts                # Application state configuration & persistence
+│   ├── storage.ts              # LocalStorage persistence & parameter URL encoding
+│   ├── ui-manager.ts           # DOM event listeners, tooltips, and control panel bindings
+│   ├── viewport-manager.ts     # 6-viewport grid orchestration & focus mode switcher
 │   └── worker.ts               # Web Worker dual-mode compute & offscreen render loop
 └── vitest.config.ts            # Vitest unit test configuration
 ```
