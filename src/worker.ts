@@ -159,6 +159,7 @@ let currentPixelRatio = 1;
 // Benchmark Execution Mode
 let currentMode: BenchmarkMode = 'offscreen';
 let canvasFpsCap = 60;
+const VISUAL_PRESENT_TOLERANCE_MS = 0.5;
 
 // Static pre-allocated TypedArrays for Zero-GC in-place mutation
 let currentResolution = 64;
@@ -410,7 +411,7 @@ function runBenchmarkIteration(): void {
     // 3. Present visual preview to presentation canvas dynamically capped by canvasFpsCap using zero-copy transferFromImageBitmap
     const now = performance.now();
     const visualPresentIntervalMs = 1000 / (canvasFpsCap > 0 ? canvasFpsCap : 60);
-    if (now - lastVisualPresentTime >= visualPresentIntervalMs - 0.5 && presentationBitmapCtx && standaloneCanvas) {
+    if (now - lastVisualPresentTime >= visualPresentIntervalMs - VISUAL_PRESENT_TOLERANCE_MS && presentationBitmapCtx && standaloneCanvas) {
       lastVisualPresentTime = now;
       try {
         const bitmap = standaloneCanvas.transferToImageBitmap();

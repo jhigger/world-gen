@@ -1184,6 +1184,7 @@ function updateCardMetricPair(curEl: HTMLElement | null, avgEl: HTMLElement | nu
   }
 }
 
+const DOM_METRIC_THROTTLE_MS = 100;
 let lastDomMetricUpdate = 0;
 
 function animationLoop() {
@@ -1191,18 +1192,16 @@ function animationLoop() {
 
   // Canvas Visual Cap for main-thread UI rendering (decoupled from calculation throughput fpsLimit)
   const targetCanvasFps = state.canvasFpsCap || 60;
-  if (targetCanvasFps < 60) {
-    const frameInterval = 1000 / targetCanvasFps;
-    const elapsed = now - lastRenderTime;
+  const frameInterval = 1000 / targetCanvasFps;
+  const elapsed = now - lastRenderTime;
 
-    if (elapsed < frameInterval - 1.0) {
-      requestAnimationFrame(animationLoop);
-      return;
-    }
-    lastRenderTime = now - (elapsed % frameInterval);
-  } else {
-    lastRenderTime = now;
+  if (elapsed < frameInterval - 1.0) {
+    requestAnimationFrame(animationLoop);
+    return;
   }
+  lastRenderTime = now - (elapsed % frameInterval);
+
+  const shouldUpdateDomMetrics = now - lastDomMetricUpdate >= DOM_METRIC_THROTTLE_MS;
 
   let dt = (now - lastTime) / 1000;
   lastTime = now;
@@ -1397,8 +1396,6 @@ function animationLoop() {
       const avgRenderTime = metricsTrackers[i].getGlobalAverageRenderTime();
       const avgRuggedness = metricsTrackers[i].getGlobalAverageRuggedness();
 
-      const shouldUpdateDomMetrics = now - lastDomMetricUpdate >= 100;
-
       if (els && shouldUpdateDomMetrics) {
         const focusedIdx = activeFocusedIdx >= 0 && activeFocusedIdx < availableAlgorithms.length ? activeFocusedIdx : 0;
         if (offscreenBenchmark.getIsRunning() && i === focusedIdx && latestWorkerTelemetry) {
@@ -1427,8 +1424,6 @@ function animationLoop() {
       activeCount++;
     }
   }
-
-  const shouldUpdateDomMetrics = now - lastDomMetricUpdate >= 100;
 
   // 6. Display aggregated benchmark summaries (throttled to 100ms / 10 Hz)
   if (shouldUpdateDomMetrics && (benchmarkSuite.isActive() || isSequentialBenchmarkRunning)) {
