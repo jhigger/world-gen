@@ -53,10 +53,11 @@ describe('UIManager interface', () => {
   it('triggers onResetMetrics and onClearCaches when config parameters change', async () => {
     const { UIManager } = await import('./ui-manager');
     const { ObservableState } = await import('./observable-state');
+    const { state } = await import('./state');
 
     const ui = new UIManager();
-    const fakeState = { resolution: 120, params: { scale: 50 } };
-    const obs = new ObservableState(fakeState as any);
+    const fakeState = { ...state, resolution: 120 };
+    const obs = new ObservableState(fakeState);
 
     const onClearCaches = vi.fn();
     const onResetMetrics = vi.fn();
@@ -68,5 +69,29 @@ describe('UIManager interface', () => {
     expect(onClearCaches).toHaveBeenCalled();
     expect(onResetMetrics).toHaveBeenCalled();
   });
+
+  it('triggers onResetMetrics and resets DOM metrics when viewMode or focusedIndex changes', async () => {
+    const { UIManager } = await import('./ui-manager');
+    const { ObservableState } = await import('./observable-state');
+    const { state } = await import('./state');
+
+    const ui = new UIManager();
+    const fakeState = { ...state, viewMode: 'grid' as const, focusedIndex: 0 };
+    const obs = new ObservableState(fakeState);
+
+    const onResetMetrics = vi.fn();
+    const resetDOMSpy = vi.spyOn(ui, 'resetDOMMetrics');
+
+    ui.init(obs, undefined, { onResetMetrics });
+
+    obs.data.viewMode = 'single';
+    expect(onResetMetrics).toHaveBeenCalledTimes(1);
+    expect(resetDOMSpy).toHaveBeenCalledTimes(1);
+
+    obs.data.focusedIndex = 2;
+    expect(onResetMetrics).toHaveBeenCalledTimes(2);
+    expect(resetDOMSpy).toHaveBeenCalledTimes(2);
+  });
 });
+
 

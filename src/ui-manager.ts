@@ -155,6 +155,8 @@ export class UIManager {
         const { viewMode, focusedIndex } = stateObs.data;
         this.viewportManager?.setGridMode(viewMode, focusedIndex);
         this.handleGridModeChange(viewMode, focusedIndex);
+        this.resetDOMMetrics();
+        this.callbacks?.onResetMetrics?.();
       }
 
       if (path === 'showMetrics') {
@@ -184,6 +186,7 @@ export class UIManager {
       ];
       if (configPaths.includes(path)) {
         this.callbacks?.onClearCaches?.();
+        this.resetDOMMetrics();
         this.callbacks?.onResetMetrics?.();
       }
     });
@@ -193,6 +196,24 @@ export class UIManager {
     this.setupTooltips();
     this.setupMobileUI();
     this.setupMathAnalysisToggle();
+  }
+
+  public resetDOMMetrics(count = 6): void {
+    if (typeof document === 'undefined') return;
+    for (let i = 0; i < count; i++) {
+      const els = this.getCachedMetricElements(i);
+      if (!els) continue;
+      if (els.fps) els.fps.textContent = '--';
+      if (els.fpsAvg) els.fpsAvg.textContent = '--';
+      if (els.frametime) els.frametime.textContent = '--';
+      if (els.frametimeAvg) els.frametimeAvg.textContent = '--';
+      if (els.time) els.time.textContent = '--';
+      if (els.timeAvg) els.timeAvg.textContent = '--';
+      if (els.math) els.math.textContent = '--';
+      if (els.mathAvg) els.mathAvg.textContent = '--';
+      if (els.ruggedness) els.ruggedness.textContent = '--';
+      if (els.ruggednessAvg) els.ruggednessAvg.textContent = '--';
+    }
   }
 
   public getCachedMetricElements(index: number): MetricCardElements | null {
