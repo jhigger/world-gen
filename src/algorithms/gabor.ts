@@ -18,6 +18,7 @@ export class GaborNoiseAlgorithm implements TerrainAlgorithm {
   badge = 'Anisotropic';
   description = 'Sparse convolution of Gabor kernels combining Gaussian envelopes with sinusoidal oscillations to generate anisotropic, directionally-aligned terrain structures.';
   complexity = 'O(392 × octaves)';
+  complexityDescription = 'Evaluates a 7×7 cell search window (49 cells) with 8 Poisson impulses per cell, resulting in 392 impulse kernel evaluations per octave per sample point.';
 
   // Gabor-specific properties
   impulseDensity: number = 0.75;          // K parameter (width/bandwidth of Gaussian envelope)

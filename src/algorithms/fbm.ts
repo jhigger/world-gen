@@ -18,6 +18,7 @@ export class FBMNoise implements TerrainAlgorithm {
   badge = 'fBm';
   description = 'Layers octaves of gradient noise with domain warping to produce self-similar fractal terrain with organic, swirling continental features.';
   complexity = 'O(3 × octaves)';
+  complexityDescription = 'Evaluates 3 directional 1D simplex noise components per octave per sample point.';
 
   private p: number[] = new Array(512);
   private currentSeed: number = -1;

@@ -928,7 +928,14 @@
                 <h4>Mathematical Analysis</h4>
                 <p>Sparse convolution of Gabor kernels combining Gaussian envelopes with sinusoidal oscillations to generate anisotropic, directionally-aligned terrain structures.</p>
                 <div class="complexity-grid">
-                  <div class="complexity-item"><strong>Time (Vertex):</strong> &Theta;(N_imp)</div>
+                  <div class="complexity-item has-tooltip" title="O(392 × octaves): 7×7 cell window (49 cells) × 8 Poisson impulses = 392 impulse evaluations per octave per sample point">
+                    <strong>Time (Vertex):</strong> &Theta;(N_imp) [O(392 &times; octaves)]
+                    <div class="tooltip-box">
+                      <h5>Gabor Complexity: O(392 &times; octaves)</h5>
+                      <p class="tooltip-desc">Convolves a 7&times;7 cell search grid (49 cells) with 8 Poisson impulses per cell, resulting in 392 impulse kernel evaluations per octave per vertex sample point.</p>
+                      <p><strong>Breakdown:</strong> 7&times;7 grid &times; 8 impulses/cell &times; octaves = 392 &times; octaves evaluations.</p>
+                    </div>
+                  </div>
                   <div class="complexity-item"><strong>Time (Grid):</strong> &Theta;(N_imp &middot; N&sup2;)</div>
                   <div class="complexity-item"><strong>Space (Aux):</strong> &Theta;(1)</div>
                   <div class="complexity-item"><strong>Space (Grid):</strong> &Theta;(N&sup2;)</div>

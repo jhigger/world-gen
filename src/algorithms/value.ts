@@ -13,6 +13,7 @@ export class ValueNoise implements TerrainAlgorithm {
   badge = 'Lattice';
   description = 'Assigns random values to grid intersections and interpolates between them. Produces blockier, more angular grid-aligned shapes.';
   complexity = 'O(octaves)';
+  complexityDescription = 'Evaluates 4 grid corner bilinear values per octave per sample point.';
 
   private p: number[] = new Array(512);
   private currentSeed: number = -1;

@@ -23,6 +23,7 @@ export interface CompiledAlgoResult extends RawBenchmarkMetrics {
   perSampleUs: number;
   memoryKB: number;
   complexity: string;
+  complexityDescription?: string;
 }
 
 export const BYTES_PER_FLOAT32 = 4;
@@ -34,13 +35,16 @@ export function enrichAlgoMetrics(raw: RawBenchmarkMetrics, algoIdx: number, res
     ? parseFloat(((exactFrameMs * 1000) / totalSamples).toFixed(3))
     : 0;
   const memoryKB = parseFloat(((totalSamples * BYTES_PER_FLOAT32) / 1024).toFixed(1));
-  const complexity = availableAlgorithms[algoIdx]?.complexity || '';
+  const algo = availableAlgorithms[algoIdx];
+  const complexity = algo?.complexity || '';
+  const complexityDescription = algo?.complexityDescription || '';
 
   return {
     ...raw,
     perSampleUs,
     memoryKB,
     complexity,
+    complexityDescription,
   };
 }
 
@@ -227,12 +231,14 @@ export class BenchmarkOrchestrator {
         perSampleUs: m.perSampleUs,
         memoryKB: m.memoryKB,
         complexity: m.complexity,
+        complexityDescription: m.complexityDescription || algo.complexityDescription || '',
       };
     });
 
     const chartRowsHtml = metricsData.map((metricItem) => {
       const avgPct = Math.max(2, Math.min(100, (metricItem.avgFps / maxFps) * 100));
       const lowPct = Math.max(2, Math.min(100, (metricItem.lowFps / maxFps) * 100));
+      const tooltipText = metricItem.complexityDescription ? `${metricItem.complexity}: ${metricItem.complexityDescription}` : metricItem.complexity;
 
       return `
         <div class="chart-row">
@@ -240,7 +246,7 @@ export class BenchmarkOrchestrator {
             <span class="chart-algo-name">${metricItem.name}</span>
             <div class="chart-algo-tags">
               <span class="chart-algo-badge">${metricItem.badge}</span>
-              <span class="chart-algo-badge chart-complexity-badge">${metricItem.complexity}</span>
+              <span class="chart-algo-badge chart-complexity-badge" title="${tooltipText}">${metricItem.complexity}</span>
             </div>
           </div>
           <div class="chart-metrics-strip">

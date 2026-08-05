@@ -27,6 +27,7 @@ export interface TerrainAlgorithm {
   badge: string;       // Classification badge (e.g. "Fractal", "Voronoi").
   description: string; // Short summary of the underlying mathematical concept.
   complexity: string; // Big-O complexity notation per sample evaluation.
+  complexityDescription?: string; // Human-readable detailed explanation of complexity calculation.
 
   /**
    * Generates a 2D grid of normalized heights (typically between 0 and 1).

@@ -14,6 +14,7 @@ export class WorleyNoise implements TerrainAlgorithm {
   badge = 'Voronoi';
   description = 'Calculates distances to nearest seed points. Produces cellular geometric patterns suited for stone, scales, or dry valley structures.';
   complexity = 'O(9 × octaves)';
+  complexityDescription = 'Evaluates a 3×3 cell search window (9 neighboring cells) to find the minimum distance to feature points per octave per sample point.';
 
   /**
    * Deterministic 32-bit unsigned cell seed.

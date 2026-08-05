@@ -13,6 +13,7 @@ export class SimplexNoise implements TerrainAlgorithm {
   badge = 'Optimal';
   description = 'Divides space into a simplex grid (triangles in 2D), reducing directional artifacts and lowering coordinate computation scaling cost to O(N²).';
   complexity = 'O(octaves)';
+  complexityDescription = 'Evaluates 3 simplex cell corner gradient dot products per octave per sample point.';
 
   private p: number[] = new Array(512);
   private currentSeed: number = -1;
