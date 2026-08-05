@@ -4,7 +4,7 @@ import { ViewportManager } from './viewport-manager';
 import { PerformanceMetrics, BenchmarkSuite } from './benchmark';
 import { HydraulicErosion } from './physics';
 import { TerrainPipeline } from './pipeline';
-import { state, clearHeightmapCaches, resetStateToDefaults } from './state';
+import { state, clearHeightmapCaches, resetStateToDefaults, getResolvedBenchmarkDuration, getResolvedErosionDuration } from './state';
 import { saveConfig, loadConfig } from './storage';
 import { OffscreenBenchmarkManager } from './offscreen-benchmark';
 import type { BenchmarkMode, TelemetryPayload } from './worker';
@@ -75,6 +75,9 @@ const valUiScale = getDomElement<HTMLInputElement>('val-ui-scale')!;
 
 const selectErosionDuration = getDomElement<HTMLSelectElement>('select-erosion-duration');
 const valErosionDuration = getDomElement<HTMLSpanElement>('val-erosion-duration');
+const customErosionDurationContainer = getDomElement<HTMLDivElement>('custom-erosion-duration-container');
+const paramCustomErosionDuration = getDomElement<HTMLInputElement>('param-custom-erosion-duration');
+const valCustomErosionDuration = getDomElement<HTMLInputElement>('val-custom-erosion-duration');
 const erosionStatusBadge = getDomElement<HTMLDivElement>('erosion-status-badge');
 const lblErosionProgress = getDomElement<HTMLSpanElement>('lbl-erosion-progress');
 
@@ -88,6 +91,9 @@ const btnResetErosion = getDomElement<HTMLButtonElement>('btn-reset-erosion')!;
 
 const selectBenchmarkDuration = getDomElement<HTMLSelectElement>('select-benchmark-duration');
 const valBenchmarkDuration = getDomElement<HTMLSpanElement>('val-benchmark-duration');
+const customBenchmarkDurationContainer = getDomElement<HTMLDivElement>('custom-benchmark-duration-container');
+const paramCustomBenchmarkDuration = getDomElement<HTMLInputElement>('param-custom-benchmark-duration');
+const valCustomBenchmarkDuration = getDomElement<HTMLInputElement>('val-custom-benchmark-duration');
 const selectBenchmarkMode = getDomElement<HTMLSelectElement>('select-benchmark-mode');
 const valBenchmarkMode = getDomElement<HTMLSpanElement>('val-benchmark-mode');
 
@@ -430,14 +436,44 @@ function syncDOMToState(): void {
   if (selectErosionDuration) {
     selectErosionDuration.value = state.erosionDuration || 'infinite';
     if (valErosionDuration) {
-      const selectedOpt = selectErosionDuration.options[selectErosionDuration.selectedIndex];
-      valErosionDuration.textContent = selectedOpt ? selectedOpt.text : state.erosionDuration;
+      if (state.erosionDuration === 'custom') {
+        valErosionDuration.textContent = `${state.customErosionDuration || 20}s`;
+      } else {
+        const selectedOpt = selectErosionDuration.options[selectErosionDuration.selectedIndex];
+        valErosionDuration.textContent = selectedOpt ? selectedOpt.text : state.erosionDuration;
+      }
+    }
+    if (customErosionDurationContainer) {
+      if (state.erosionDuration === 'custom') {
+        customErosionDurationContainer.classList.remove('hidden');
+      } else {
+        customErosionDurationContainer.classList.add('hidden');
+      }
     }
   }
+  if (paramCustomErosionDuration) paramCustomErosionDuration.value = (state.customErosionDuration || 20).toString();
+  if (valCustomErosionDuration) valCustomErosionDuration.value = (state.customErosionDuration || 20).toString();
+
   if (selectBenchmarkDuration) {
-    selectBenchmarkDuration.value = (state.benchmarkDuration || 10).toString();
-    if (valBenchmarkDuration) valBenchmarkDuration.textContent = `${state.benchmarkDuration || 10}s`;
+    selectBenchmarkDuration.value = state.benchmarkDuration.toString();
+    if (valBenchmarkDuration) {
+      if (state.benchmarkDuration === 'custom') {
+        valBenchmarkDuration.textContent = `${state.customBenchmarkDuration || 10}s`;
+      } else {
+        const selectedOpt = selectBenchmarkDuration.options[selectBenchmarkDuration.selectedIndex];
+        valBenchmarkDuration.textContent = selectedOpt ? selectedOpt.text : `${getResolvedBenchmarkDuration()}s`;
+      }
+    }
+    if (customBenchmarkDurationContainer) {
+      if (state.benchmarkDuration === 'custom') {
+        customBenchmarkDurationContainer.classList.remove('hidden');
+      } else {
+        customBenchmarkDurationContainer.classList.add('hidden');
+      }
+    }
   }
+  if (paramCustomBenchmarkDuration) paramCustomBenchmarkDuration.value = (state.customBenchmarkDuration || 10).toString();
+  if (valCustomBenchmarkDuration) valCustomBenchmarkDuration.value = (state.customBenchmarkDuration || 10).toString();
 
   applyUiScale();
 
@@ -699,17 +735,60 @@ function setupUIEvents() {
     selectErosionDuration.addEventListener('change', () => {
       state.erosionDuration = selectErosionDuration.value;
       if (valErosionDuration) {
-        const selectedOpt = selectErosionDuration.options[selectErosionDuration.selectedIndex];
-        valErosionDuration.textContent = selectedOpt ? selectedOpt.text : state.erosionDuration;
+        if (state.erosionDuration === 'custom') {
+          valErosionDuration.textContent = `${state.customErosionDuration || 20}s`;
+        } else {
+          const selectedOpt = selectErosionDuration.options[selectErosionDuration.selectedIndex];
+          valErosionDuration.textContent = selectedOpt ? selectedOpt.text : state.erosionDuration;
+        }
+      }
+      if (customErosionDurationContainer) {
+        if (state.erosionDuration === 'custom') {
+          customErosionDurationContainer.classList.remove('hidden');
+        } else {
+          customErosionDurationContainer.classList.add('hidden');
+        }
       }
     });
   }
 
+function bindDualControlInputPair(
+  sliderEl: HTMLInputElement | null,
+  numInputEl: HTMLInputElement | null,
+  minVal: number,
+  maxVal: number,
+  stepVal: number,
+  onUpdate: (clampedVal: number) => void
+) {
+  if (!sliderEl || !numInputEl) return;
+  const update = (raw: number) => {
+    const clamped = clampAndRound(raw, minVal, maxVal, stepVal);
+    onUpdate(clamped);
+    sliderEl.value = clamped.toString();
+    numInputEl.value = clamped.toString();
+  };
+
+  sliderEl.addEventListener('input', () => update(parseInt(sliderEl.value, 10)));
+  numInputEl.addEventListener('change', () => update(parseInt(numInputEl.value, 10)));
+}
+
+  bindDualControlInputPair(
+    paramCustomErosionDuration,
+    valCustomErosionDuration,
+    1, 3600, 1,
+    (clamped) => {
+      state.customErosionDuration = clamped;
+      if (valErosionDuration && state.erosionDuration === 'custom') {
+        valErosionDuration.textContent = `${clamped}s`;
+      }
+    }
+  );
+
   toggleErosion.addEventListener('click', () => {
     state.isErosionActive = !state.isErosionActive;
     if (state.isErosionActive) {
-      if (state.erosionDuration !== 'infinite') {
-        const targetSec = parseFloat(state.erosionDuration);
+      const targetSec = getResolvedErosionDuration();
+      if (targetSec !== 'infinite') {
         if (erosionElapsedTime >= targetSec) {
           erosionElapsedTime = 0;
         }
@@ -731,12 +810,37 @@ function setupUIEvents() {
   // Benchmark Duration Selection
   if (selectBenchmarkDuration) {
     selectBenchmarkDuration.addEventListener('change', () => {
-      state.benchmarkDuration = parseInt(selectBenchmarkDuration.value) || 10;
+      const val = selectBenchmarkDuration.value;
+      state.benchmarkDuration = val === 'custom' ? 'custom' : (parseInt(val, 10) || 10);
       if (valBenchmarkDuration) {
-        valBenchmarkDuration.textContent = `${state.benchmarkDuration}s`;
+        if (state.benchmarkDuration === 'custom') {
+          valBenchmarkDuration.textContent = `${state.customBenchmarkDuration || 10}s`;
+        } else {
+          const selectedOpt = selectBenchmarkDuration.options[selectBenchmarkDuration.selectedIndex];
+          valBenchmarkDuration.textContent = selectedOpt ? selectedOpt.text : `${getResolvedBenchmarkDuration()}s`;
+        }
+      }
+      if (customBenchmarkDurationContainer) {
+        if (state.benchmarkDuration === 'custom') {
+          customBenchmarkDurationContainer.classList.remove('hidden');
+        } else {
+          customBenchmarkDurationContainer.classList.add('hidden');
+        }
       }
     });
   }
+
+  bindDualControlInputPair(
+    paramCustomBenchmarkDuration,
+    valCustomBenchmarkDuration,
+    1, 3600, 1,
+    (clamped) => {
+      state.customBenchmarkDuration = clamped;
+      if (valBenchmarkDuration && state.benchmarkDuration === 'custom') {
+        valBenchmarkDuration.textContent = `${clamped}s`;
+      }
+    }
+  );
 
   // Wireframe Toggle
   toggleWireframe.addEventListener('change', () => {
@@ -1330,7 +1434,7 @@ function animationLoop() {
       benchmarkSuite.update(dt, cameras, controls);
     }
     benchmarkElapsedTime += dt;
-    const targetBenchSec = state.benchmarkDuration || 10;
+    const targetBenchSec = getResolvedBenchmarkDuration();
     const currentAlgoName = availableAlgorithms[currentBenchmarkAlgoIndex]?.name || 'Algorithm';
     valBenchState.textContent = `Benchmarking (${currentBenchmarkAlgoIndex + 1}/${availableAlgorithms.length}): ${currentAlgoName}... ${benchmarkElapsedTime.toFixed(1)}s / ${targetBenchSec.toFixed(1)}s`;
 
@@ -1364,10 +1468,10 @@ function animationLoop() {
     erosionElapsedTime += dt;
     if (erosionStatusBadge) erosionStatusBadge.classList.remove('hidden');
 
-    if (state.erosionDuration === 'infinite') {
+    const targetSec = getResolvedErosionDuration();
+    if (targetSec === 'infinite') {
       if (lblErosionProgress) lblErosionProgress.textContent = `Eroding... ${erosionElapsedTime.toFixed(1)}s (Infinite)`;
     } else {
-      const targetSec = parseFloat(state.erosionDuration);
       if (lblErosionProgress) lblErosionProgress.textContent = `Eroding... ${erosionElapsedTime.toFixed(1)}s / ${targetSec.toFixed(1)}s`;
       if (erosionElapsedTime >= targetSec) {
         state.isErosionActive = false;

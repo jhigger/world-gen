@@ -161,12 +161,15 @@ body {
   font-weight: 400;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
 .control-group label span {
   color: var(--accent-secondary);
   font-family: var(--font-mono);
   font-weight: 700;
+  white-space: nowrap;
 }
 
 /* Buttons, Selects and Ranges */

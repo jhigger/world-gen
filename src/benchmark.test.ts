@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PerformanceMetrics } from './benchmark';
+import { state, getResolvedBenchmarkDuration, getResolvedErosionDuration } from './state';
 
 describe('PerformanceMetrics', () => {
   let metrics: PerformanceMetrics;
@@ -63,5 +64,31 @@ describe('PerformanceMetrics', () => {
 
     // Global Average FPS = 1000 / ((99*10 + 100)/100) = 1000 / 10.9ms = 92 FPS
     expect(metrics.getGlobalAverageFPS()).toBe(92);
+  });
+});
+
+describe('Duration Resolvers', () => {
+  it('resolves preset and custom benchmark durations', () => {
+    state.benchmarkDuration = 300;
+    expect(getResolvedBenchmarkDuration()).toBe(300);
+
+    state.benchmarkDuration = 600;
+    expect(getResolvedBenchmarkDuration()).toBe(600);
+
+    state.benchmarkDuration = 'custom';
+    state.customBenchmarkDuration = 45;
+    expect(getResolvedBenchmarkDuration()).toBe(45);
+  });
+
+  it('resolves preset, infinite, and custom erosion durations', () => {
+    state.erosionDuration = 'infinite';
+    expect(getResolvedErosionDuration()).toBe('infinite');
+
+    state.erosionDuration = '15';
+    expect(getResolvedErosionDuration()).toBe(15);
+
+    state.erosionDuration = 'custom';
+    state.customErosionDuration = 90;
+    expect(getResolvedErosionDuration()).toBe(90);
   });
 });

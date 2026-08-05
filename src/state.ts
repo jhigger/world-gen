@@ -12,7 +12,9 @@ export interface TerrainConfig {
   palette: ColorPalette;
   isErosionActive: boolean;
   erosionDuration: string;
-  benchmarkDuration: number;
+  customErosionDuration?: number;
+  benchmarkDuration: number | string;
+  customBenchmarkDuration?: number;
   showWireframe: boolean;
   showMetrics: boolean;
   viewMode: 'grid' | 'single';
@@ -48,7 +50,9 @@ const initialState = {
   activePalette: 'topo' as ColorPalette,
   isErosionActive: false,
   erosionDuration: 'infinite' as string,
-  benchmarkDuration: 10,
+  customErosionDuration: 20,
+  benchmarkDuration: 10 as number | string,
+  customBenchmarkDuration: 10,
   showWireframe: false,
   showMetrics: true,
   autoOrbit: true,
@@ -104,7 +108,9 @@ export function resetStateToDefaults() {
   state.activePalette = 'topo';
   state.isErosionActive = false;
   state.erosionDuration = 'infinite';
+  state.customErosionDuration = 20;
   state.benchmarkDuration = 10;
+  state.customBenchmarkDuration = 10;
   state.showWireframe = false;
   state.autoOrbit = true;
   state.viewMode = 'grid';
@@ -126,4 +132,21 @@ export function resetStateToDefaults() {
 
   state.animationTime = 0;
   clearHeightmapCaches();
+}
+
+export function getResolvedBenchmarkDuration(): number {
+  if (state.benchmarkDuration === 'custom') {
+    return state.customBenchmarkDuration || 10;
+  }
+  const parsed = typeof state.benchmarkDuration === 'number'
+    ? state.benchmarkDuration
+    : parseInt(state.benchmarkDuration as string, 10);
+  return isNaN(parsed) ? 10 : parsed;
+}
+
+export function getResolvedErosionDuration(): number | 'infinite' {
+  if (state.erosionDuration === 'infinite') return 'infinite';
+  if (state.erosionDuration === 'custom') return state.customErosionDuration || 20;
+  const parsed = parseFloat(state.erosionDuration);
+  return isNaN(parsed) ? 'infinite' : parsed;
 }
