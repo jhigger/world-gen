@@ -1413,29 +1413,8 @@ function animationLoop() {
         metricsTrackers[i].addRenderTime(stats.renderTime);
         metricsTrackers[i].addMathTime(stats.mathTime);
         metricsTrackers[i].addRuggedness(stats.ruggedness);
-      } else if (!isOffscreenCanvasActive) {
-        const algo = availableAlgorithms[i];
-        if (algo) {
-          const tMathStart = performance.now();
-          const p = state.params;
-          let sum = 0;
-          let sumSq = 0;
-          let count = 0;
-          for (let y = 0; y < activeRes; y++) {
-            for (let x = 0; x < activeRes; x++) {
-              const h = algo.evaluate(x, y, p);
-              sum += h;
-              sumSq += h * h;
-              count++;
-            }
-          }
-          const mathTime = performance.now() - tMathStart;
-          const mean = count > 0 ? sum / count : 0;
-          const ruggedness = count > 0 ? Math.sqrt(Math.max(0, (sumSq / count) - (mean * mean))) : 0;
-          metricsTrackers[i].addMathTime(mathTime);
-          metricsTrackers[i].addRuggedness(ruggedness);
-        }
       }
+
 
       
       // Use cached DOM elements instead of querying by ID on every frame
