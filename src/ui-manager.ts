@@ -45,7 +45,6 @@ export interface MetricCardElements {
 }
 
 export class UIManager {
-  private erosionElapsedTime = 0;
   private callbacks: UIManagerCallbacks | null = null;
   private viewportManager: ViewportManager | null = null;
   private cachedMetricElements: Record<number, MetricCardElements> = {};
@@ -136,7 +135,6 @@ export class UIManager {
 
   setErosionElapsedTime(time: number): void {
     state._erosionElapsedTime = time;
-    this.erosionElapsedTime = time;
   }
 
   init(

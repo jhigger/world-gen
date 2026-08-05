@@ -11,6 +11,7 @@ describe('TerrainPipeline', () => {
     name: 'Mock',
     badge: 'M',
     description: 'Mock Algo',
+    complexity: 'O(1)',
     generate: vi.fn().mockReturnValue([[0.5, 0.5], [0.5, 0.5]]),
     evaluate: vi.fn().mockReturnValue(0.5)
   };

@@ -17,9 +17,10 @@ describe('UIManager interface', () => {
   it('syncs viewMode and focusedIndex changes to ViewportManager', async () => {
     const { UIManager } = await import('./ui-manager');
     const { ObservableState } = await import('./observable-state');
+    const { state } = await import('./state');
 
     const ui = new UIManager();
-    const fakeState = { viewMode: 'grid' as 'grid' | 'single', focusedIndex: 0, params: {} };
+    const fakeState = { ...state, viewMode: 'grid' as 'grid' | 'single', focusedIndex: 0 };
     const obs = new ObservableState(fakeState);
     const mockViewportManager = {
       setGridMode: vi.fn(),
@@ -37,10 +38,11 @@ describe('UIManager interface', () => {
   it('syncs selectSingleAlgo dropdown when switching to grid view', async () => {
     const { UIManager } = await import('./ui-manager');
     const { ObservableState } = await import('./observable-state');
+    const { state } = await import('./state');
 
     const ui = new UIManager();
     ui.selectSingleAlgo = { value: '2', addEventListener: vi.fn() } as unknown as HTMLSelectElement;
-    const fakeState = { viewMode: 'single' as 'grid' | 'single', focusedIndex: 2, params: {} };
+    const fakeState = { ...state, viewMode: 'single' as 'grid' | 'single', focusedIndex: 2 };
     const obs = new ObservableState(fakeState);
 
     ui.init(obs);
@@ -76,7 +78,7 @@ describe('UIManager interface', () => {
     const { state } = await import('./state');
 
     const ui = new UIManager();
-    const fakeState = { ...state, viewMode: 'grid' as const, focusedIndex: 0 };
+    const fakeState = { ...state, viewMode: 'grid' as 'grid' | 'single', focusedIndex: 0 };
     const obs = new ObservableState(fakeState);
 
     const onResetMetrics = vi.fn();

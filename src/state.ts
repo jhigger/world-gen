@@ -33,6 +33,7 @@ export interface TerrainConfig {
   cameraOffsetY?: number;
   cameraOffsetX?: number;
   cameraOffsetZ?: number;
+  _erosionElapsedTime?: number;
 }
 
 const initialState = {
@@ -71,6 +72,7 @@ const initialState = {
   cameraOffsetY: 0.5,
   cameraOffsetX: 0.0,
   cameraOffsetZ: 0.0,
+  _erosionElapsedTime: 0,
   keysPressed: {
     space: false,
     shift: false,
