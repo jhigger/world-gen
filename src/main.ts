@@ -22,88 +22,92 @@ import type { BenchmarkMode, TelemetryPayload } from './worker';
 // ============================================================================
 // DOM ELEMENT RETRIEVAL
 // ============================================================================
-const gridContainer = document.getElementById('terrain-grid') as HTMLDivElement;
-const btnGridView = document.getElementById('btn-grid-view') as HTMLButtonElement;
-const selectSingleAlgo = document.getElementById('select-single-algo') as HTMLSelectElement;
+const getDomElement = <T extends HTMLElement>(id: string): T | null =>
+  typeof document !== 'undefined' ? (document.getElementById(id) as T) : null;
+
+const gridContainer = getDomElement<HTMLDivElement>('terrain-grid')!;
+const btnGridView = getDomElement<HTMLButtonElement>('btn-grid-view')!;
+const selectSingleAlgo = getDomElement<HTMLSelectElement>('select-single-algo')!;
 
 // Numeric input for the terrain seed
-const paramSeed = document.getElementById('param-seed') as HTMLInputElement;
+const paramSeed = getDomElement<HTMLInputElement>('param-seed')!;
 
-const paramResolution = document.getElementById('param-resolution') as HTMLInputElement;
-const paramZoom = document.getElementById('param-zoom') as HTMLInputElement;
-const paramPitch = document.getElementById('param-pitch') as HTMLInputElement;
-const paramTargetX = document.getElementById('param-target-x') as HTMLInputElement;
-const paramTargetY = document.getElementById('param-target-y') as HTMLInputElement;
-const paramTargetZ = document.getElementById('param-target-z') as HTMLInputElement;
-const paramHeight = document.getElementById('param-height') as HTMLInputElement;
-const paramWidth = document.getElementById('param-width') as HTMLInputElement;
-const paramScale = document.getElementById('param-scale') as HTMLInputElement;
-const paramOctaves = document.getElementById('param-octaves') as HTMLInputElement;
-const paramPersistence = document.getElementById('param-persistence') as HTMLInputElement;
-const paramColor = document.getElementById('param-color') as HTMLSelectElement;
+const paramResolution = getDomElement<HTMLInputElement>('param-resolution')!;
+const paramZoom = getDomElement<HTMLInputElement>('param-zoom')!;
+const paramPitch = getDomElement<HTMLInputElement>('param-pitch')!;
+const paramTargetX = getDomElement<HTMLInputElement>('param-target-x')!;
+const paramTargetY = getDomElement<HTMLInputElement>('param-target-y')!;
+const paramTargetZ = getDomElement<HTMLInputElement>('param-target-z')!;
+const paramHeight = getDomElement<HTMLInputElement>('param-height')!;
+const paramWidth = getDomElement<HTMLInputElement>('param-width')!;
+const paramScale = getDomElement<HTMLInputElement>('param-scale')!;
+const paramOctaves = getDomElement<HTMLInputElement>('param-octaves')!;
+const paramPersistence = getDomElement<HTMLInputElement>('param-persistence')!;
+const paramColor = getDomElement<HTMLSelectElement>('param-color')!;
 
 // Control inputs for rotation and the FPS limit
-const paramRotateSpeed = document.getElementById('param-rotate-speed') as HTMLInputElement;
-const paramNoiseSpeed = document.getElementById('param-noise-speed') as HTMLInputElement;
-const paramFpsLimit = document.getElementById('param-fps-limit') as HTMLSelectElement;
-const customFpsContainer = document.getElementById('custom-fps-container') as HTMLDivElement;
-const paramCustomFps = document.getElementById('param-custom-fps') as HTMLInputElement;
-const paramUiScale = document.getElementById('param-ui-scale') as HTMLInputElement;
+const paramRotateSpeed = getDomElement<HTMLInputElement>('param-rotate-speed')!;
+const paramNoiseSpeed = getDomElement<HTMLInputElement>('param-noise-speed')!;
+const paramFpsLimit = getDomElement<HTMLSelectElement>('param-fps-limit')!;
+const customFpsContainer = getDomElement<HTMLDivElement>('custom-fps-container')!;
+const paramCustomFps = getDomElement<HTMLInputElement>('param-custom-fps')!;
+const paramUiScale = getDomElement<HTMLInputElement>('param-ui-scale')!;
 
 // UI value labels
-const valSeed = document.getElementById('val-seed') as HTMLSpanElement;
-const valResolution = document.getElementById('val-resolution') as HTMLInputElement;
-const valZoom = document.getElementById('val-zoom') as HTMLInputElement;
-const valPitch = document.getElementById('val-pitch') as HTMLInputElement;
-const valTargetX = document.getElementById('val-target-x') as HTMLInputElement;
-const valTargetY = document.getElementById('val-target-y') as HTMLInputElement;
-const valTargetZ = document.getElementById('val-target-z') as HTMLInputElement;
-const valHeight = document.getElementById('val-height') as HTMLInputElement;
-const valWidth = document.getElementById('val-width') as HTMLInputElement;
-const valScale = document.getElementById('val-scale') as HTMLInputElement;
-const valOctaves = document.getElementById('val-octaves') as HTMLInputElement;
-const valPersistence = document.getElementById('val-persistence') as HTMLInputElement;
+const valSeed = getDomElement<HTMLSpanElement>('val-seed')!;
+const valResolution = getDomElement<HTMLInputElement>('val-resolution')!;
+const valZoom = getDomElement<HTMLInputElement>('val-zoom')!;
+const valPitch = getDomElement<HTMLInputElement>('val-pitch')!;
+const valTargetX = getDomElement<HTMLInputElement>('val-target-x')!;
+const valTargetY = getDomElement<HTMLInputElement>('val-target-y')!;
+const valTargetZ = getDomElement<HTMLInputElement>('val-target-z')!;
+const valHeight = getDomElement<HTMLInputElement>('val-height')!;
+const valWidth = getDomElement<HTMLInputElement>('val-width')!;
+const valScale = getDomElement<HTMLInputElement>('val-scale')!;
+const valOctaves = getDomElement<HTMLInputElement>('val-octaves')!;
+const valPersistence = getDomElement<HTMLInputElement>('val-persistence')!;
 
-const valRotateSpeed = document.getElementById('val-rotate-speed') as HTMLInputElement;
-const valNoiseSpeed = document.getElementById('val-noise-speed') as HTMLInputElement;
-const valFpsLimit = document.getElementById('val-fps-limit') as HTMLSpanElement;
-const valCustomFps = document.getElementById('val-custom-fps') as HTMLInputElement;
-const valUiScale = document.getElementById('val-ui-scale') as HTMLInputElement;
+const valRotateSpeed = getDomElement<HTMLInputElement>('val-rotate-speed')!;
+const valNoiseSpeed = getDomElement<HTMLInputElement>('val-noise-speed')!;
+const valFpsLimit = getDomElement<HTMLSpanElement>('val-fps-limit')!;
+const valCustomFps = getDomElement<HTMLInputElement>('val-custom-fps')!;
+const valUiScale = getDomElement<HTMLInputElement>('val-ui-scale')!;
 
-const selectErosionDuration = document.getElementById('select-erosion-duration') as HTMLSelectElement | null;
-const valErosionDuration = document.getElementById('val-erosion-duration') as HTMLSpanElement | null;
-const erosionStatusBadge = document.getElementById('erosion-status-badge') as HTMLDivElement | null;
-const lblErosionProgress = document.getElementById('lbl-erosion-progress') as HTMLSpanElement | null;
+const selectErosionDuration = getDomElement<HTMLSelectElement>('select-erosion-duration');
+const valErosionDuration = getDomElement<HTMLSpanElement>('val-erosion-duration');
+const erosionStatusBadge = getDomElement<HTMLDivElement>('erosion-status-badge');
+const lblErosionProgress = getDomElement<HTMLSpanElement>('lbl-erosion-progress');
 
-const toggleErosion = document.getElementById('toggle-erosion') as HTMLButtonElement;
-const lblErosion = document.getElementById('lbl-erosion') as HTMLElement;
-const iconErosionPlay = document.getElementById('icon-erosion-play') as HTMLElement;
-const iconErosionPause = document.getElementById('icon-erosion-pause') as HTMLElement;
-const toggleWireframe = document.getElementById('toggle-wireframe') as HTMLInputElement;
-const toggleMetrics = document.getElementById('toggle-metrics') as HTMLInputElement | null;
-const btnResetErosion = document.getElementById('btn-reset-erosion') as HTMLButtonElement;
+const toggleErosion = getDomElement<HTMLButtonElement>('toggle-erosion')!;
+const lblErosion = getDomElement<HTMLElement>('lbl-erosion')!;
+const iconErosionPlay = getDomElement<HTMLElement>('icon-erosion-play')!;
+const iconErosionPause = getDomElement<HTMLElement>('icon-erosion-pause')!;
+const toggleWireframe = getDomElement<HTMLInputElement>('toggle-wireframe')!;
+const toggleMetrics = getDomElement<HTMLInputElement>('toggle-metrics');
+const btnResetErosion = getDomElement<HTMLButtonElement>('btn-reset-erosion')!;
 
-const selectBenchmarkDuration = document.getElementById('select-benchmark-duration') as HTMLSelectElement | null;
-const valBenchmarkDuration = document.getElementById('val-benchmark-duration') as HTMLSpanElement | null;
-const selectBenchmarkMode = document.getElementById('select-benchmark-mode') as HTMLSelectElement | null;
-const valBenchmarkMode = document.getElementById('val-benchmark-mode') as HTMLSpanElement | null;
+const selectBenchmarkDuration = getDomElement<HTMLSelectElement>('select-benchmark-duration');
+const valBenchmarkDuration = getDomElement<HTMLSpanElement>('val-benchmark-duration');
+const selectBenchmarkMode = getDomElement<HTMLSelectElement>('select-benchmark-mode');
+const valBenchmarkMode = getDomElement<HTMLSpanElement>('val-benchmark-mode');
 
-const btnBenchmark = document.getElementById('btn-benchmark') as HTMLButtonElement;
-const btnResetDefaults = document.getElementById('btn-reset-defaults') as HTMLButtonElement;
-const panelBenchStatus = document.getElementById('benchmark-status') as HTMLDivElement;
-const valBenchState = document.getElementById('bench-state') as HTMLSpanElement;
-const valBenchFps = document.getElementById('bench-fps') as HTMLSpanElement;
-const valBenchFrametime = document.getElementById('bench-frametime') as HTMLSpanElement;
-const valBenchMathTime = document.getElementById('bench-math-time') as HTMLSpanElement;
-const valBenchGpuTime = document.getElementById('bench-gpu-time') as HTMLSpanElement;
-const valBenchTotalFrames = document.getElementById('bench-total-frames') as HTMLSpanElement;
+const btnBenchmark = getDomElement<HTMLButtonElement>('btn-benchmark')!;
+const btnResetDefaults = getDomElement<HTMLButtonElement>('btn-reset-defaults')!;
+const panelBenchStatus = getDomElement<HTMLDivElement>('benchmark-status')!;
+const valBenchState = getDomElement<HTMLSpanElement>('bench-state')!;
+const valBenchFps = getDomElement<HTMLSpanElement>('bench-fps')!;
+const valBenchFrametime = getDomElement<HTMLSpanElement>('bench-frametime')!;
+const valBenchMathTime = getDomElement<HTMLSpanElement>('bench-math-time')!;
+const valBenchGpuTime = getDomElement<HTMLSpanElement>('bench-gpu-time')!;
+const valBenchTotalFrames = getDomElement<HTMLSpanElement>('bench-total-frames')!;
 
-const benchmarkResultsModal = document.getElementById('benchmark-results-modal') as HTMLDivElement | null;
-const benchmarkModalBackdrop = document.getElementById('benchmark-modal-backdrop') as HTMLDivElement | null;
-const benchmarkModalClose = document.getElementById('benchmark-modal-close') as HTMLButtonElement | null;
-const btnCloseBenchmarkModal = document.getElementById('btn-close-benchmark-modal') as HTMLButtonElement | null;
-const btnReBenchmark = document.getElementById('btn-re-benchmark') as HTMLButtonElement | null;
-const benchmarkChartContainer = document.getElementById('benchmark-chart-container') as HTMLDivElement | null;
+const benchmarkResultsModal = getDomElement<HTMLDivElement>('benchmark-results-modal');
+const benchmarkModalBackdrop = getDomElement<HTMLDivElement>('benchmark-modal-backdrop');
+const benchmarkModalClose = getDomElement<HTMLButtonElement>('benchmark-modal-close');
+const btnCloseBenchmarkModal = getDomElement<HTMLButtonElement>('btn-close-benchmark-modal');
+const btnReBenchmark = getDomElement<HTMLButtonElement>('btn-re-benchmark');
+const benchmarkChartContainer = getDomElement<HTMLDivElement>('benchmark-chart-container');
+
 
 let erosionElapsedTime = 0;
 let benchmarkElapsedTime = 0;
@@ -1186,20 +1190,41 @@ function updateCardMetricPair(curEl: HTMLElement | null, avgEl: HTMLElement | nu
 
 const DOM_METRIC_THROTTLE_MS = 100;
 let lastDomMetricUpdate = 0;
+let lastMathTime = performance.now();
+
+export function shouldExecuteMathTick(fpsLimit: string, customFps: number, now: number, lastMathTime: number): boolean {
+  if (fpsLimit === 'uncapped') return true;
+  const parsedFps = fpsLimit === 'custom' ? customFps : parseInt(fpsLimit);
+  const targetFps = isNaN(parsedFps) || parsedFps <= 0 ? 60 : parsedFps;
+  const interval = 1000 / targetFps;
+  return (now - lastMathTime) >= (interval - 1.0);
+}
+
+export function shouldRenderCanvasFrame(canvasFpsCap: number, now: number, lastRenderTime: number): boolean {
+  const targetFps = canvasFpsCap || 60;
+  const interval = 1000 / targetFps;
+  return (now - lastRenderTime) >= (interval - 1.0);
+}
 
 function animationLoop() {
   const now = performance.now();
 
-  // Canvas Visual Cap for main-thread UI rendering (decoupled from calculation throughput fpsLimit)
-  const targetCanvasFps = state.canvasFpsCap || 60;
-  const frameInterval = 1000 / targetCanvasFps;
-  const elapsed = now - lastRenderTime;
-
-  if (elapsed < frameInterval - 1.0) {
+  // 1. Math Calculation Throttling (Unthrottled when state.fpsLimit === 'uncapped')
+  if (!shouldExecuteMathTick(state.fpsLimit, state.customFps, now, lastMathTime)) {
     requestAnimationFrame(animationLoop);
     return;
   }
-  lastRenderTime = now - (elapsed % frameInterval);
+  const mathFps = state.fpsLimit === 'custom' ? state.customFps : (parseInt(state.fpsLimit) || 60);
+  const mathInterval = 1000 / mathFps;
+  lastMathTime = state.fpsLimit === 'uncapped' ? now : now - ((now - lastMathTime) % mathInterval);
+
+  // 2. WebGL Canvas Visual Presentation Capping (Rate-limited to state.canvasFpsCap)
+  const isCanvasRenderDue = shouldRenderCanvasFrame(state.canvasFpsCap, now, lastRenderTime);
+  const targetCanvasFps = state.canvasFpsCap || 60;
+  const canvasInterval = 1000 / targetCanvasFps;
+  if (isCanvasRenderDue) {
+    lastRenderTime = now - ((now - lastRenderTime) % canvasInterval);
+  }
 
   const shouldUpdateDomMetrics = now - lastDomMetricUpdate >= DOM_METRIC_THROTTLE_MS;
 
@@ -1354,7 +1379,7 @@ function animationLoop() {
     });
   }
 
-  // 5. Draw active viewports (pause main-thread WebGL rendering when OffscreenCanvas worker mode is active)
+  // 5. Draw active viewports (pause main-thread WebGL rendering when OffscreenCanvas worker mode is active or when canvas render is not due)
   let totalBenchmarkFps = 0;
   let totalBenchmarkFrametime = 0;
   let totalBenchmarkTime = 0;
@@ -1362,9 +1387,10 @@ function animationLoop() {
   let activeCount = 0;
 
   const isOffscreenCanvasActive = offscreenBenchmark.getIsRunning() && offscreenBenchmark.getCurrentMode() === 'offscreen';
-  const statsMap = isOffscreenCanvasActive
+  const statsMap = (!isCanvasRenderDue || isOffscreenCanvasActive)
     ? {}
     : viewportManager.update(state.params, activeRes, state.activePalette, state.showWireframe, state.heightmapCache, state.isErosionActive);
+
 
   for (let i = 0; i < availableAlgorithms.length; i++) {
     const r = viewportManager.getRenderer(i);
@@ -1823,36 +1849,39 @@ function setupMathAnalysisToggle() {
 }
 
 // Window resizing handler
-window.addEventListener('resize', () => {
-  viewportManager.resize();
-});
-
-// ============================================================================
-// APPLICATION INITIALIZATION
-// ============================================================================
-window.addEventListener('DOMContentLoaded', async () => {
-  await initViewports();
-  loadConfig();
-  setupUIEvents();
-  setupHotkeys();
-  setupTooltips();
-  setupMobileUI();
-  setupMathAnalysisToggle();
-
-  // Initial layout sizing pass
-  requestAnimationFrame(() => {
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', () => {
     viewportManager.resize();
-    
-    // Start the animation loop
-    requestAnimationFrame(animationLoop);
+  });
 
-    // Fade out the loading screen once the first render cycle completes
+  // ============================================================================
+  // APPLICATION INITIALIZATION
+  // ============================================================================
+  window.addEventListener('DOMContentLoaded', async () => {
+    await initViewports();
+    loadConfig();
+    setupUIEvents();
+    setupHotkeys();
+    setupTooltips();
+    setupMobileUI();
+    setupMathAnalysisToggle();
+
+    // Initial layout sizing pass
     requestAnimationFrame(() => {
-      const appContainer = document.querySelector('.app-container');
-      appContainer?.classList.remove('loading');
+      viewportManager.resize();
+      
+      // Start the animation loop
+      requestAnimationFrame(animationLoop);
+
+      // Fade out the loading screen once the first render cycle completes
+      requestAnimationFrame(() => {
+        const appContainer = document.querySelector('.app-container');
+        appContainer?.classList.remove('loading');
+      });
     });
   });
-});
+}
+
 
 
 
