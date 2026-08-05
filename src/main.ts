@@ -1186,7 +1186,8 @@ function updateCardMetricPair(curEl: HTMLElement | null, avgEl: HTMLElement | nu
 function animationLoop() {
   const now = performance.now();
 
-  // FPS limit control
+  // FPS limit control for main-thread UI rendering
+  // When 'uncapped', main thread UI runs at native display VSync (via requestAnimationFrame) for zero lag.
   if (state.fpsLimit !== 'uncapped') {
     const parsedFps = state.fpsLimit === 'custom' ? state.customFps : parseInt(state.fpsLimit);
     const targetFps = isNaN(parsedFps) || parsedFps <= 0 ? 60 : parsedFps;
@@ -1353,14 +1354,17 @@ function animationLoop() {
     });
   }
 
-  // 5. Draw active viewports
+  // 5. Draw active viewports (pause main-thread WebGL rendering when OffscreenCanvas worker mode is active)
   let totalBenchmarkFps = 0;
   let totalBenchmarkFrametime = 0;
   let totalBenchmarkTime = 0;
   let totalBenchmarkMathTime = 0;
   let activeCount = 0;
 
-  const statsMap = viewportManager.update(state.params, activeRes, state.activePalette, state.showWireframe, state.heightmapCache, state.isErosionActive);
+  const isOffscreenCanvasActive = offscreenBenchmark.getIsRunning() && offscreenBenchmark.getCurrentMode() === 'offscreen';
+  const statsMap = isOffscreenCanvasActive
+    ? {}
+    : viewportManager.update(state.params, activeRes, state.activePalette, state.showWireframe, state.heightmapCache, state.isErosionActive);
 
   for (let i = 0; i < availableAlgorithms.length; i++) {
     const r = viewportManager.getRenderer(i);
