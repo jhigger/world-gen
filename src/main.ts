@@ -1192,18 +1192,25 @@ const DOM_METRIC_THROTTLE_MS = 100;
 let lastDomMetricUpdate = 0;
 let lastMathTime = performance.now();
 
+export function isIntervalElapsed(intervalMs: number, now: number, lastTime: number): boolean {
+  return (now - lastTime) >= intervalMs;
+}
+
+export function getResolvedFps(fpsLimit: string, customFps: number): number {
+  if (fpsLimit === 'uncapped') return 0;
+  const parsedFps = fpsLimit === 'custom' ? customFps : parseInt(fpsLimit, 10);
+  return isNaN(parsedFps) || parsedFps <= 0 ? 60 : parsedFps;
+}
+
 export function shouldExecuteMathTick(fpsLimit: string, customFps: number, now: number, lastMathTime: number): boolean {
-  if (fpsLimit === 'uncapped') return true;
-  const parsedFps = fpsLimit === 'custom' ? customFps : parseInt(fpsLimit);
-  const targetFps = isNaN(parsedFps) || parsedFps <= 0 ? 60 : parsedFps;
-  const interval = 1000 / targetFps;
-  return (now - lastMathTime) >= (interval - 1.0);
+  const fps = getResolvedFps(fpsLimit, customFps);
+  if (fps === 0) return true;
+  return isIntervalElapsed(1000 / fps, now, lastMathTime);
 }
 
 export function shouldRenderCanvasFrame(canvasFpsCap: number, now: number, lastRenderTime: number): boolean {
-  const targetFps = canvasFpsCap || 60;
-  const interval = 1000 / targetFps;
-  return (now - lastRenderTime) >= (interval - 1.0);
+  const fps = canvasFpsCap || 60;
+  return isIntervalElapsed(1000 / fps, now, lastRenderTime);
 }
 
 function animationLoop() {
@@ -1214,9 +1221,9 @@ function animationLoop() {
     requestAnimationFrame(animationLoop);
     return;
   }
-  const mathFps = state.fpsLimit === 'custom' ? state.customFps : (parseInt(state.fpsLimit) || 60);
-  const mathInterval = 1000 / mathFps;
-  lastMathTime = state.fpsLimit === 'uncapped' ? now : now - ((now - lastMathTime) % mathInterval);
+  const mathFps = getResolvedFps(state.fpsLimit, state.customFps);
+  const mathInterval = mathFps > 0 ? 1000 / mathFps : 0;
+  lastMathTime = mathFps === 0 ? now : now - ((now - lastMathTime) % mathInterval);
 
   // 2. WebGL Canvas Visual Presentation Capping (Rate-limited to state.canvasFpsCap)
   const isCanvasRenderDue = shouldRenderCanvasFrame(state.canvasFpsCap, now, lastRenderTime);
@@ -1406,7 +1413,30 @@ function animationLoop() {
         metricsTrackers[i].addRenderTime(stats.renderTime);
         metricsTrackers[i].addMathTime(stats.mathTime);
         metricsTrackers[i].addRuggedness(stats.ruggedness);
+      } else if (!isOffscreenCanvasActive) {
+        const algo = availableAlgorithms[i];
+        if (algo) {
+          const tMathStart = performance.now();
+          const p = state.params;
+          let sum = 0;
+          let sumSq = 0;
+          let count = 0;
+          for (let y = 0; y < activeRes; y++) {
+            for (let x = 0; x < activeRes; x++) {
+              const h = algo.evaluate(x, y, p);
+              sum += h;
+              sumSq += h * h;
+              count++;
+            }
+          }
+          const mathTime = performance.now() - tMathStart;
+          const mean = count > 0 ? sum / count : 0;
+          const ruggedness = count > 0 ? Math.sqrt(Math.max(0, (sumSq / count) - (mean * mean))) : 0;
+          metricsTrackers[i].addMathTime(mathTime);
+          metricsTrackers[i].addRuggedness(ruggedness);
+        }
       }
+
       
       // Use cached DOM elements instead of querying by ID on every frame
       const els = cachedMetricElements[i];

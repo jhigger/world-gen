@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { state, resetStateToDefaults } from './state';
 import { OffscreenBenchmarkManager } from './offscreen-benchmark';
-import { shouldExecuteMathTick, shouldRenderCanvasFrame } from './main';
+import { shouldExecuteMathTick, shouldRenderCanvasFrame, isIntervalElapsed, getResolvedFps } from './main';
 
 describe('Decoupled Canvas Capping & Metric Throttling', () => {
   beforeEach(() => {
@@ -100,6 +100,19 @@ describe('Decoupled Canvas Capping & Metric Throttling', () => {
   });
 
   describe('Main-Thread Decoupled Math Throughput & Canvas Capping', () => {
+    it('resolves fpsLimit strings into numeric target FPS values', () => {
+      expect(getResolvedFps('uncapped', 60)).toBe(0);
+      expect(getResolvedFps('60', 60)).toBe(60);
+      expect(getResolvedFps('30', 60)).toBe(30);
+      expect(getResolvedFps('custom', 120)).toBe(120);
+      expect(getResolvedFps('invalid', 60)).toBe(60);
+    });
+
+    it('checks interval elapsed status accurately without fuzzy offset', () => {
+      expect(isIntervalElapsed(16.66, 1010, 1000)).toBe(false);
+      expect(isIntervalElapsed(16.66, 1017, 1000)).toBe(true);
+    });
+
     it('allows unthrottled math execution when fpsLimit is uncapped regardless of interval', () => {
       const lastMathTime = 1000;
       // 2ms elapsed, far below 60fps frame interval (16.6ms)
@@ -109,20 +122,21 @@ describe('Decoupled Canvas Capping & Metric Throttling', () => {
     it('throttles math execution when fpsLimit is capped', () => {
       const lastMathTime = 1000;
       // Target 60 FPS -> interval ~16.67ms
-      expect(shouldExecuteMathTick('60', 60, 1010, lastMathTime)).toBe(false); // 10ms < 15.67ms
-      expect(shouldExecuteMathTick('60', 60, 1016, lastMathTime)).toBe(true);  // 16ms >= 15.67ms
+      expect(shouldExecuteMathTick('60', 60, 1010, lastMathTime)).toBe(false);
+      expect(shouldExecuteMathTick('60', 60, 1017, lastMathTime)).toBe(true);
     });
 
     it('clamps visual canvas rendering to canvasFpsCap independent of math throughput', () => {
       const lastRenderTime = 1000;
       // Target 60 FPS -> interval ~16.67ms
-      expect(shouldRenderCanvasFrame(60, 1010, lastRenderTime)).toBe(false); // 10ms < 15.67ms
-      expect(shouldRenderCanvasFrame(60, 1016, lastRenderTime)).toBe(true);  // 16ms >= 15.67ms
+      expect(shouldRenderCanvasFrame(60, 1010, lastRenderTime)).toBe(false);
+      expect(shouldRenderCanvasFrame(60, 1017, lastRenderTime)).toBe(true);
 
       // Target 30 FPS -> interval ~33.33ms
-      expect(shouldRenderCanvasFrame(30, 1025, lastRenderTime)).toBe(false); // 25ms < 32.33ms
-      expect(shouldRenderCanvasFrame(30, 1033, lastRenderTime)).toBe(true);  // 33ms >= 32.33ms
+      expect(shouldRenderCanvasFrame(30, 1025, lastRenderTime)).toBe(false);
+      expect(shouldRenderCanvasFrame(30, 1034, lastRenderTime)).toBe(true);
     });
   });
 });
+
 
