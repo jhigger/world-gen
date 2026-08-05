@@ -116,12 +116,12 @@
         </div>
 
         <div class="control-group has-tooltip">
-          <label for="param-resolution">Tessellation: <input type="number" id="val-resolution" class="val-input" min="20" max="320" step="10" value="120"></label>
-          <input type="range" id="param-resolution" min="20" max="320" step="10" value="120">
+          <label for="param-resolution">Tessellation: <input type="number" id="val-resolution" class="val-input" min="16" max="512" value="128"></label>
+          <input type="range" id="param-resolution" min="4" max="9" step="1" value="7">
           <div class="tooltip-box">
             <h5>Tessellation</h5>
             <p class="tooltip-desc">The vertex density of the terrain mesh, representing the number of subdivisions in the 3D plane.</p>
-            <p><strong>Calculated:</strong> N x N divisions (e.g., 40x40 to 320x320 grid segments).</p>
+            <p><strong>Calculated:</strong> N x N divisions (e.g., 16x16 to 512x512 grid segments in power-of-2 steps).</p>
             <p><strong>Significance:</strong> Higher values create more detailed and visually complex terrain but increase rendering computations.</p>
           </div>
         </div>

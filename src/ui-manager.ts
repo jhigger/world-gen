@@ -21,6 +21,16 @@ function clampAndRound(val: number, min: number, max: number, dec: number): numb
   return Math.round(Math.max(min, Math.min(max, val)) * mult) / mult;
 }
 
+function resolutionToExponent(res: number): number {
+  const clamped = Math.max(16, Math.min(512, isNaN(res) ? 128 : res));
+  return Math.round(Math.log2(clamped));
+}
+
+function exponentToResolution(exp: number): number {
+  const clampedExp = Math.max(4, Math.min(9, isNaN(exp) ? 7 : exp));
+  return Math.pow(2, clampedExp);
+}
+
 export interface UIManagerCallbacks {
   onToggleBenchmark?: () => void;
   onStartBenchmarkForCurrentMode?: () => void;
@@ -350,7 +360,8 @@ export class UIManager {
 
   public syncDOMToState(): void {
     if (this.paramSeed) this.paramSeed.value = state.params.seed.toString();
-    if (this.paramResolution) this.paramResolution.value = state.resolution.toString();
+    if (this.paramResolution) this.paramResolution.value = resolutionToExponent(state.resolution).toString();
+    if (this.valResolution) this.valResolution.value = state.resolution.toString();
     if (this.paramZoom) this.paramZoom.value = state.savedZoom.toString();
     if (this.paramPitch) this.paramPitch.value = state.savedPitch.toString();
     if (this.paramTargetX) this.paramTargetX.value = state.cameraOffsetX.toString();
@@ -481,7 +492,9 @@ export class UIManager {
     });
 
     this.paramResolution?.addEventListener('input', () => {
-      state.resolution = parseInt(this.paramResolution!.value);
+      const exp = parseInt(this.paramResolution!.value);
+      state.resolution = exponentToResolution(exp);
+      if (this.valResolution) this.valResolution.value = state.resolution.toString();
     });
 
     this.paramZoom?.addEventListener('input', () => {
@@ -573,8 +586,10 @@ export class UIManager {
 
     this.valResolution?.addEventListener('change', () => {
       const rawVal = parseInt(this.valResolution!.value);
-      state.resolution = clampAndRound(rawVal, 20, 320, 10);
-      this.paramResolution!.value = state.resolution.toString();
+      const exp = resolutionToExponent(rawVal);
+      state.resolution = exponentToResolution(exp);
+      this.valResolution!.value = state.resolution.toString();
+      if (this.paramResolution) this.paramResolution.value = exp.toString();
     });
 
     this.valZoom?.addEventListener('change', () => {

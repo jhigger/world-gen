@@ -47,7 +47,7 @@ const initialState = {
     offsetX: 0,
     offsetY: 0
   } as TerrainParams,
-  resolution: 120,
+  resolution: 128,
   activePalette: 'topo' as ColorPalette,
   isErosionActive: false,
   erosionDuration: 'infinite' as string,
@@ -106,7 +106,7 @@ export function resetStateToDefaults() {
   state.params.offsetX = 0;
   state.params.offsetY = 0;
 
-  state.resolution = 120;
+  state.resolution = 128;
   state.activePalette = 'topo';
   state.isErosionActive = false;
   state.erosionDuration = 'infinite';
