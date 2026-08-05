@@ -179,11 +179,12 @@ export class AnimationLoop {
 
     // 3. Drive continuous wave motion when erosion is inactive AND there is no paused eroded state
     const hasCachedHeightmap = state.heightmapCache.some((cache: number[][] | null) => cache !== null);
-    if (!state.isErosionActive && !hasCachedHeightmap && !benchmarkSuite.isActive()) {
+    if (!state.isErosionActive && !hasCachedHeightmap && !benchmarkSuite.isActive() && state.noiseSpeed !== 0) {
       state.animationTime += dt * 0.55 * state.noiseSpeed;
       state.params.offsetX = state.animationTime * 1.8;
       state.params.offsetY = state.animationTime * 1.2;
-    } else {
+    } else if (state.params.offsetX !== 0 || state.params.offsetY !== 0) {
+      state.animationTime = 0;
       state.params.offsetX = 0;
       state.params.offsetY = 0;
     }

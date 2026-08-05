@@ -94,4 +94,23 @@ describe('Diagnose Issues Regression Tests', () => {
     expect(onClearCaches).toHaveBeenCalled();
     expect(ui.getErosionElapsedTime()).toBe(0);
   });
+
+  it('Fix Issue D: Updating params.offsetX, params.offsetY, or animationTime during noise animation does NOT trigger storage writes or UI string updates', () => {
+    resetStateToDefaults();
+    const ui = new UIManager();
+    const obs = new ObservableState(state);
+    const saveSpy = vi.spyOn(storage, 'saveConfig');
+    const updateUIStringsSpy = vi.spyOn(ui, 'updateUIStrings');
+
+    ui.init(obs);
+
+    // Simulate animation loop updating params.offsetX, params.offsetY, animationTime
+    obs.data.params.offsetX = 0.5;
+    obs.data.params.offsetY = 0.3;
+    obs.data.animationTime = 0.1;
+
+    // Verify storage save and UI string updates were NOT triggered by animation offsets
+    expect(saveSpy).not.toHaveBeenCalled();
+    expect(updateUIStringsSpy).not.toHaveBeenCalled();
+  });
 });

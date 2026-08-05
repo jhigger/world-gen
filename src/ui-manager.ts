@@ -155,9 +155,43 @@ export class UIManager {
     this.viewportManager = viewportManager || null;
     this.callbacks = callbacks || null;
 
+    const userConfigurablePaths = new Set([
+      'resolution',
+      'activePalette',
+      'isErosionActive',
+      'erosionDuration',
+      'customErosionDuration',
+      'benchmarkDuration',
+      'customBenchmarkDuration',
+      'showWireframe',
+      'showMetrics',
+      'viewMode',
+      'focusedIndex',
+      'rotateSpeed',
+      'noiseSpeed',
+      'fpsLimit',
+      'customFps',
+      'canvasFpsCap',
+      'uiScale',
+      'savedZoom',
+      'savedYaw',
+      'savedPitch',
+      'cameraOffsetX',
+      'cameraOffsetY',
+      'cameraOffsetZ',
+      'params.seed',
+      'params.scale',
+      'params.octaves',
+      'params.persistence',
+      'params.heightScale',
+      'params.widthScale',
+    ]);
+
     stateObs.subscribe((path) => {
-      this.updateUIStrings();
-      this.updateStorage();
+      if (userConfigurablePaths.has(path)) {
+        this.updateUIStrings();
+        this.updateStorage();
+      }
 
       if (path === 'viewMode' || path === 'focusedIndex') {
         const { viewMode, focusedIndex } = stateObs.data;
