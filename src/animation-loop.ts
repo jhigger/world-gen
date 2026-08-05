@@ -207,12 +207,18 @@ export class AnimationLoop {
         }
       }
 
-      pipelines.forEach((p, i) => {
-        if (!viewportManager.getRenderer(i)) return;
+      let generatedCachesThisFrame = 0;
+      const activeFocusedIdx = orchestrator.isRunning() ? orchestrator.getCurrentAlgoIndex() : state.focusedIndex;
+
+      pipelines.forEach((pipeline, i) => {
+        if (!viewportManager.isViewportActive(i, activeFocusedIdx)) return;
+
         if (!state.heightmapCache[i]) {
-          state.heightmapCache[i] = p.generateBase(activeRes, activeRes, state.params);
+          if (generatedCachesThisFrame >= 1) return;
+          state.heightmapCache[i] = pipeline.generateBase(activeRes, activeRes, state.params);
+          generatedCachesThisFrame++;
         }
-        p.tickPhysics(state.heightmapCache[i]!, dt);
+        pipeline.tickPhysics(state.heightmapCache[i]!, dt);
       });
     }
 

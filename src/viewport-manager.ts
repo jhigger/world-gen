@@ -411,6 +411,15 @@ export class ViewportManager {
   }
 
   /**
+   * Checks whether a specific algorithm viewport is active and visible given override focused index.
+   */
+  public isViewportActive(index: number, overrideFocusedIndex?: number): boolean {
+    if (this.renderers.length > 0 && !this.renderers[index]) return false;
+    const activeFocused = overrideFocusedIndex !== undefined ? overrideFocusedIndex : this.focusedIndex;
+    return this.viewMode === 'grid' || (this.viewMode === 'single' && index === activeFocused);
+  }
+
+  /**
    * Executes render pass for active viewports.
    */
   public update(
@@ -424,21 +433,18 @@ export class ViewportManager {
     const statsResult: Record<number, RenderStats | void> = {};
 
     for (let i = 0; i < this.algorithms.length; i++) {
-      if (!this.renderers[i]) continue;
-      const shouldRender = this.viewMode === 'grid' || (this.viewMode === 'single' && i === this.focusedIndex);
+      if (!this.isViewportActive(i)) continue;
 
-      if (shouldRender) {
-        const customMap = customHeightmaps && customHeightmaps[i] ? customHeightmaps[i]! : undefined;
-        const stats = this.renderers[i]!.render(
-          params,
-          resolution,
-          palette,
-          showWireframe,
-          customMap,
-          forceDirty
-        );
-        statsResult[i] = stats;
-      }
+      const customMap = customHeightmaps && customHeightmaps[i] ? customHeightmaps[i]! : undefined;
+      const stats = this.renderers[i]!.render(
+        params,
+        resolution,
+        palette,
+        showWireframe,
+        customMap,
+        forceDirty
+      );
+      statsResult[i] = stats;
     }
 
     return statsResult;
